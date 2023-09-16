@@ -11,7 +11,9 @@ pipeline = transformers.pipeline(
     "text-generation",
     model=model,
     #torch_dtype=torch.float16,
-    device_map="auto",
+    #device_map="auto",
+    #device="mps",
+    device="cpu",
 )
 
 sequences = pipeline(
@@ -23,4 +25,4 @@ sequences = pipeline(
     max_length=200,
 )
 
-
+import pdb; pdb.set_trace()
