@@ -47,59 +47,7 @@ dist = Categorical(logits=outputs2.scores[0][0])
 sample_kl = kl_divergence(true_dist, dist)
 print(sample_kl)
 
+print("llama output without assistant token")
 print(llama_tokenizer.batch_decode(outputs.sequences))
+print("llama output with extra assistant token")
 print(llama_tokenizer.batch_decode(outputs2.sequences))
-
-import os
-import openai
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-
-response = openai.ChatCompletion.create(
-  model="gpt-3.5-turbo",
-  messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hi."},
-  ],
-  temperature=0,
-  max_tokens=1024
-)
-print(response)
-
-response = openai.ChatCompletion.create(
-  model="gpt-3.5-turbo",
-  messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hi."},
-        {"role": "assistant", "content": "Hi."},
-  ],
-  temperature=0,
-  max_tokens=1024
-)
-print(response)
-
-response = openai.ChatCompletion.create(
-  model="gpt-3.5-turbo",
-  messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hi."},
-        {"role": "assistant", "content": "Hi. How can I help"},
-  ],
-  temperature=0,
-  max_tokens=1024
-)
-print(response)
-
-response = openai.ChatCompletion.create(
-  model="gpt-4",
-  messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hi."},
-        {"role": "assistant", "content": "Hi. How can I help"},
-  ],
-  temperature=0,
-  max_tokens=1024
-)
-print(response)
-import pdb; pdb.set_trace()
