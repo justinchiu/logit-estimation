@@ -10,9 +10,6 @@ from torch.distributions import Categorical, kl_divergence
 
 torch.set_grad_enabled(False)
 
-
-
-
 llama = "meta-llama/Llama-2-7b-chat-hf"
 gpt = "gpt2"
 
@@ -77,11 +74,11 @@ for K in Ks:
 
     Ks_df.append(K)
     kls.append(topk_kl)
-    methods.append("topk")
+    methods.append("top5")
 
     Ks_df.append(K)
     kls.append(sample_topk_kl)
-    methods.append("sample_topk")
+    methods.append("sample+top5")
 
 df = pd.DataFrame({'x': Ks_df, 'y': kls, "method": methods})
 sns.scatterplot(data=df, x="x", y="y", hue="method")
