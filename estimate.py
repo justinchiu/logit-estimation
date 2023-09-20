@@ -8,17 +8,7 @@ import pandas as pd
 
 from torch.distributions import Categorical, kl_divergence
 
-torch.set_grad_enabled(False)
-
-llama = "meta-llama/Llama-2-7b-chat-hf"
-gpt = "gpt2"
-
-gpt_tokenizer = AutoTokenizer.from_pretrained(gpt)
-llama_tokenizer = AutoTokenizer.from_pretrained(llama)
-t5_tokenizer = AutoTokenizer.from_pretrained("t5-small")
-
-gpt_model = AutoModelForCausalLM.from_pretrained(gpt)
-# llama_model = AutoModelForCausalLM.from_pretrained(llama)
+from logit_diffs import estimate_diffs
 
 
 def get_kl(prefix, K):
@@ -31,6 +21,8 @@ def get_kl(prefix, K):
         do_sample=True,
         num_return_sequences=K,
     )
+
+    true_logits = outputs.scores[0][0]
 
     true_dist = Categorical(logits=outputs.scores[0][0])
     observations = outputs.sequences[:, 1]
@@ -59,37 +51,57 @@ def get_kl(prefix, K):
 
     sample_topk_kl = kl_divergence(true_dist, Categorical(probs=sample_probs),)
 
-    return sample_kl, topk_kl, sample_topk_kl
+    # use "logit bias" + greedy to recreate logits, then combine with sample_estimate
+    searched_logits = estimate_diffs(true_logits, 50)
+    searched_kl = kl_divergence(true_dist, Categorical(logits=searched_logits))
+
+    return sample_kl, topk_kl, sample_topk_kl, searched_kl
 
 
-prefix = "Hi"
-kls = []
-methods = []
-Ks = [8, 16, 32, 64, 128, 256, 512]
-Ks_df = []
-for K in Ks:
-    sample_kl, topk_kl, sample_topk_kl = get_kl(prefix, K)
-    Ks_df.append(K)
-    kls.append(sample_kl)
-    methods.append("sample")
+if __name__ == "__main__":
+    torch.set_grad_enabled(False)
 
-    Ks_df.append(K)
-    kls.append(topk_kl)
-    methods.append("top5")
+    llama = "meta-llama/Llama-2-7b-chat-hf"
+    gpt = "gpt2"
 
-    Ks_df.append(K)
-    kls.append(sample_topk_kl)
-    methods.append("sample+top5")
+    gpt_tokenizer = AutoTokenizer.from_pretrained(gpt)
+    llama_tokenizer = AutoTokenizer.from_pretrained(llama)
+    t5_tokenizer = AutoTokenizer.from_pretrained("t5-small")
 
-df = pd.DataFrame({"x": Ks_df, "y": kls, "method": methods})
-sns.scatterplot(data=df, x="x", y="y", hue="method")
+    gpt_model = AutoModelForCausalLM.from_pretrained(gpt)
+    #llama_model = AutoModelForCausalLM.from_pretrained(llama)
 
-plt.title("Scatter Plot of Num Samples vs KL")
-plt.xlabel("Num samples")
-plt.ylabel("KL")
-plt.legend()
-plt.tight_layout()
-plt.savefig("figures/samples_kl.png")
-# import pdb; pdb.set_trace()
 
-# use logit bias and greedy?
+    prefix = "Hi"
+    kls = []
+    methods = []
+    Ks = [8, 16, 32, 64, 128, 256, 512]
+    Ks_df = []
+    for K in Ks:
+        sample_kl, topk_kl, sample_topk_kl, searched_kl = get_kl(prefix, K)
+        Ks_df.append(K)
+        kls.append(sample_kl)
+        methods.append("sample")
+
+        Ks_df.append(K)
+        kls.append(topk_kl)
+        methods.append("top5")
+
+        Ks_df.append(K)
+        kls.append(sample_topk_kl)
+        methods.append("sample+top5")
+
+        Ks_df.append(K)
+        kls.append(searched_kl)
+        methods.append("searched_kl")
+
+    df = pd.DataFrame({"x": Ks_df, "y": kls, "method": methods})
+    sns.scatterplot(data=df, x="x", y="y", hue="method")
+
+    plt.title("Scatter Plot of Num Samples vs KL")
+    plt.xlabel("Num samples")
+    plt.ylabel("KL")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("figures/samples_kl.png")
+    # import pdb; pdb.set_trace()
