@@ -8,7 +8,7 @@ import pandas as pd
 
 from torch.distributions import Categorical, kl_divergence
 
-from logit_diffs import estimate_diffs
+from logit_diffs import estimate_topk_logits
 
 
 def get_kl(prefix, K):
@@ -43,7 +43,7 @@ def get_kl(prefix, K):
     topk_kl = kl_divergence(true_dist, topk_estimate)
 
     topk_mass = topk.values.logsumexp(0).exp()
-    sample_logits = sample_estimate.logits + 0
+    sample_logits = sample_estimate.logits + 0 # force copy
     sample_logits[topk.indices] = float("-inf")
     sample_mass = sample_logits.logsumexp(0).exp()
     sample_probs = sample_estimate.probs / sample_mass * (1 - topk_mass)
@@ -52,7 +52,7 @@ def get_kl(prefix, K):
     sample_topk_kl = kl_divergence(true_dist, Categorical(probs=sample_probs),)
 
     # use "logit bias" + greedy to recreate logits, then combine with sample_estimate
-    searched_logits = estimate_diffs(true_logits, 50)
+    searched_logits = estimate_topk_logits(true_logits, 50)
     searched_kl = kl_divergence(true_dist, Categorical(logits=searched_logits))
 
     return sample_kl, topk_kl, sample_topk_kl, searched_kl

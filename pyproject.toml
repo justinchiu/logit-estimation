@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "logit-estimation"
+version = "0.0.0"
+description = "Logit estimation from LLM APIs"
+authors = ["Justin Chiu <chiu.justin.t@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "*"
+pandas = "*"
+pyparsing = "*"
+python-dateutil = "*"
+rich = "*"
+tiktoken = "*"
+thefuzz = "*"
+openai = "*"
+seaborn = "*"
+torch = "*"
+transformers = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

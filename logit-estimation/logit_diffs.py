@@ -25,7 +25,7 @@ def binary_search(x, low=-0.5, high=0, eps=1e-3):
         #print(low, high)
     return mid, idx, num_calls
 
-def estimate_diffs(logits, K):
+def estimate_topK_logits(logits, K):
     """
     Estimate the diffs between the elements of the logits vector
     """
@@ -43,15 +43,6 @@ def estimate_diffs(logits, K):
         diffs.append(logit_diff)
         idxs.append(idx)
         total_calls += num_calls
-
-    true_logit_diff12 = top5.values[0] - top5.values[1]
-    true_logit_diff23 = top5.values[1] - top5.values[2]
-    true_logit_diff34 = top5.values[2] - top5.values[3]
-
-    print(diffs[0], true_logit_diff12)
-    print(diffs[1], true_logit_diff23)
-    print(diffs[2], true_logit_diff34)
-    print("total calls", total_calls)
 
     estimated_logits = torch.tensor(diffs[:K]).cumsum(0)
     out = torch.full_like(logits, float("-inf"))
