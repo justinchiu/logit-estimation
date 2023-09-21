@@ -104,4 +104,3 @@ if __name__ == "__main__":
     plt.legend()
     plt.tight_layout()
     plt.savefig("figures/samples_kl.png")
-    # import pdb; pdb.set_trace()

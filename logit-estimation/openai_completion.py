@@ -1,4 +1,6 @@
-
+"""
+Gpt-4 sometimes ignores the last assistant turn, while gpt-3.5 completes it.
+"""
 
 import os
 import openai

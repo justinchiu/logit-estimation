@@ -18,6 +18,7 @@ openai = "*"
 seaborn = "*"
 torch = "*"
 transformers = "*"
+tenacity = "*"
 
 [build-system]
 requires = ["poetry-core"]
