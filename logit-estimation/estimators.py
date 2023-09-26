@@ -120,10 +120,12 @@ if __name__ == "__main__":
 
     llama = "meta-llama/Llama-2-7b-chat-hf"
     gpt = "gpt2"
-    prefix = "hi"
+
+    model = llama
+    prefix = "[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>\nHi [/INST]"
 
     # test sampling
-    sampler = HfSampler(gpt)
+    sampler = HfSampler(model)
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
 
