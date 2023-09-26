@@ -98,7 +98,7 @@ def estimate(sampler, prefix, K, T, threshold):
     estimator = Estimator(sampler.vocab_size, threshold)
     for t in range(T):
         weight, words = estimator.weight()
-        logit_bias = {word: -100 for word in words}
+        logit_bias = {word: -1000 for word in words}
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
