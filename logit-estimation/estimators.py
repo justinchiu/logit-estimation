@@ -81,8 +81,7 @@ class Estimator:
     def mean(self):
         if len(self.samples) == 0:
             return None
-        N = sum(self.weights)
-        probs = torch.zeros(self.vocab_size) + 1e-10
+        probs = torch.zeros(self.vocab_size) + 1e-10 # smoothing
         probs.scatter_add_(
             0,
             torch.tensor(self.samples, dtype=torch.int64),
@@ -141,8 +140,8 @@ if __name__ == "__main__":
             e2 = naive_estimate(sampler, prefix, K*T)
             mu1 = e1.mean()
             mu2 = e2.mean()
-            kl1 = kl_divergence(true_dist, Categorical(probs=mu1))
-            kl2 = kl_divergence(true_dist, Categorical(probs=mu2))
+            kl1 = kl_divergence(true_dist, Categorical(probs=mu1)).item()
+            kl2 = kl_divergence(true_dist, Categorical(probs=mu2)).item()
 
             method_list.append("truncate")
             method_list.append("naive")
@@ -155,7 +154,9 @@ if __name__ == "__main__":
             #print("Max", true_dist.probs.max(), e1.mean().max(), e2.mean().max())
 
     df = pd.DataFrame({"x": samples_list, "y": kl_list, "method": method_list})
-    sns.scatterplot(data=df, x="x", y="y", hue="method")
+    sns.lineplot(data=df, x="x", y="y", hue="method", errorbar="sd")
+    #sns.lineplot(data=df, x="x", y="y", hue="method")
+    #sns.scatter(data=df, x="x", y="y", hue="method")
 
     plt.title("Scatter Plot of Num Samples vs KL")
     plt.xlabel("Num samples")
