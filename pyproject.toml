@@ -16,9 +16,9 @@ tiktoken = "*"
 thefuzz = "*"
 openai = "*"
 seaborn = "*"
-torch = "*"
 transformers = "*"
 tenacity = "*"
+torch = "*"
 
 [build-system]
 requires = ["poetry-core"]

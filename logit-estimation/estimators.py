@@ -68,7 +68,8 @@ class Estimator:
             sample_output.samples,
             torch.ones_like(sample_output.samples, dtype=torch.int32),
         )
-        Z = weight * len(sample_output.samples)
+        #Z = weight * len(sample_output.samples)
+        Z = len(sample_output.samples)
         if allowed_words is not None:
             self.Zs[allowed_words] += Z
         else:
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     true_dist = output.true_dist
 
     K = 1024
-    tau = K // 4
+    tau = K // 2
 
     Ts = [2, 4, 8, 16, 32]
 
@@ -143,8 +144,8 @@ if __name__ == "__main__":
             kl1 = kl_divergence(true_dist, Categorical(probs=mu1)).item()
             kl2 = kl_divergence(true_dist, Categorical(probs=mu2)).item()
 
-            method_list.append("truncate")
-            method_list.append("naive")
+            method_list.append("Truncate sample")
+            method_list.append("Naive sample")
             samples_list.append(K*T)
             samples_list.append(K*T)
             kl_list.append(kl1)
