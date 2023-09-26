@@ -16,7 +16,7 @@ llama_model = AutoModelForCausalLM.from_pretrained(llama)
 
 
 inputs = llama_tokenizer(
-    ["[INST] <<SYS>>\n{system_message}\n<</SYS>>\n\n[INST] Hi [/INST] Hi. How can I"],
+    ["[INST] <<SYS>>\n{system_message}\n<</SYS>>\nHi [/INST] Hi. How can I"],
     return_tensors="pt",
 )
 outputs = llama_model.generate(

@@ -11,9 +11,9 @@ from torch.distributions import Categorical, kl_divergence
 from logit_diffs import estimate_topk_logits
 
 
-def get_kl(prefix, K):
-    inputs = gpt_tokenizer([prefix], return_tensors="pt")
-    outputs = gpt_model.generate(
+def get_kl(prefix, K, model, tokenizer):
+    inputs = tokenizer([prefix], return_tensors="pt")
+    outputs = model.generate(
         **inputs,
         max_new_tokens=2,
         return_dict_in_generate=True,
@@ -64,13 +64,10 @@ if __name__ == "__main__":
     llama = "meta-llama/Llama-2-7b-chat-hf"
     gpt = "gpt2"
 
-    gpt_tokenizer = AutoTokenizer.from_pretrained(gpt)
-    llama_tokenizer = AutoTokenizer.from_pretrained(llama)
-    t5_tokenizer = AutoTokenizer.from_pretrained("t5-small")
-
-    gpt_model = AutoModelForCausalLM.from_pretrained(gpt)
-    #llama_model = AutoModelForCausalLM.from_pretrained(llama)
-
+    tokenizer = AutoTokenizer.from_pretrained(gpt)
+    model = AutoModelForCausalLM.from_pretrained(gpt)
+    #tokenizer = AutoTokenizer.from_pretrained(llama)
+    #model = AutoModelForCausalLM.from_pretrained(llama, torch_dtype=torch.bfloat16)
 
     prefix = "Hi"
     kls = []
@@ -78,7 +75,7 @@ if __name__ == "__main__":
     Ks = [8, 16, 32, 64, 128, 256, 512]
     Ks_df = []
     for K in Ks:
-        sample_kl, topk_kl, sample_topk_kl, searched_kl = get_kl(prefix, K)
+        sample_kl, topk_kl, sample_topk_kl, searched_kl = get_kl(prefix, K, model, tokenizer)
         Ks_df.append(K)
         kls.append(sample_kl)
         methods.append("sample")
