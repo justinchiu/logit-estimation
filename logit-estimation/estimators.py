@@ -78,7 +78,7 @@ class Estimator:
     def mean(self):
         if len(self.samples) == 0:
             return None
-        probs = torch.zeros(self.vocab_size) + 1e-100 # smoothing
+        probs = torch.zeros(self.vocab_size) + 1e-75 # smoothing
         probs.scatter_add_(
             0,
             torch.tensor(self.samples, dtype=torch.int64),
@@ -127,10 +127,12 @@ if __name__ == "__main__":
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
 
-    K = 1024
+    #K = 1024
+    K = 512
     tau = K // 2
 
-    Ts = [2, 4, 8, 16, 32]
+    #Ts = [2, 4, 8, 16, 32]
+    Ts = [8, 16, 32, 64]
 
     method_list = []
     samples_list = []
@@ -139,9 +141,9 @@ if __name__ == "__main__":
     max_prob_list = []
     prob_25_list = []
     prob_50_list = []
-    prob_100_list = []
+    prob_75_list = []
 
-    for _ in range(5):
+    for _ in range(10):
         for T in Ts:
             # test estimation
             e1 = estimate(sampler, prefix, K, T, tau)
@@ -164,8 +166,8 @@ if __name__ == "__main__":
             prob_25_list.append(mu2.topk(25).values[-1].item())
             prob_50_list.append(mu1.topk(50).values[-1].item())
             prob_50_list.append(mu2.topk(50).values[-1].item())
-            prob_100_list.append(mu1.topk(100).values[-1].item())
-            prob_100_list.append(mu2.topk(100).values[-1].item())
+            prob_75_list.append(mu1.topk(75).values[-1].item())
+            prob_75_list.append(mu2.topk(75).values[-1].item())
 
 
     df = pd.DataFrame({
@@ -174,7 +176,7 @@ if __name__ == "__main__":
         "max": max_prob_list,
         "25": prob_25_list,
         "50": prob_50_list,
-        "100": prob_100_list,
+        "75": prob_75_list,
         "method": method_list,
     })
     sns.lineplot(data=df, x="x", y="y", hue="method", errorbar="sd")
@@ -217,12 +219,12 @@ if __name__ == "__main__":
     plt.savefig("figures/truncated_samples_50.png")
     plt.clf()
 
-    sns.lineplot(data=df, x="x", y="100", hue="method", errorbar="sd")
-    plt.axhline(y=true_dist.probs.topk(100).values[-1].item(), color="red", linestyle="--")
-    plt.title("Scatter Plot of Num Samples vs 100th rank probability estimation")
+    sns.lineplot(data=df, x="x", y="75", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(75).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 75th rank probability estimation")
     plt.xlabel("Num samples")
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_100.png")
+    plt.savefig("figures/truncated_samples_75.png")
     plt.clf()
