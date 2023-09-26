@@ -2,10 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import torch
 
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.distributions import Categorical, kl_divergence
 
@@ -116,6 +112,10 @@ def naive_estimate(sampler, prefix, K):
 
 
 if __name__ == "__main__":
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
     llama = "meta-llama/Llama-2-7b-chat-hf"
     gpt = "gpt2"
     prefix = "hi"
