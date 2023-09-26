@@ -78,7 +78,7 @@ class Estimator:
     def mean(self):
         if len(self.samples) == 0:
             return None
-        probs = torch.zeros(self.vocab_size) + 1e-10 # smoothing
+        probs = torch.zeros(self.vocab_size) + 1e-100 # smoothing
         probs.scatter_add_(
             0,
             torch.tensor(self.samples, dtype=torch.int64),
@@ -99,6 +99,7 @@ def estimate(sampler, prefix, K, T, threshold):
     estimator = Estimator(sampler.vocab_size, threshold)
     for t in range(T):
         weight, words = estimator.weight()
+        #logit_bias = {word: -100 for word in words}
         logit_bias = {word: -1000 for word in words}
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
@@ -134,6 +135,12 @@ if __name__ == "__main__":
     method_list = []
     samples_list = []
     kl_list = []
+
+    max_prob_list = []
+    prob_25_list = []
+    prob_50_list = []
+    prob_100_list = []
+
     for _ in range(5):
         for T in Ts:
             # test estimation
@@ -151,17 +158,71 @@ if __name__ == "__main__":
             kl_list.append(kl1)
             kl_list.append(kl2)
 
-            #print("KLs", kl1, kl2)
-            #print("Max", true_dist.probs.max(), e1.mean().max(), e2.mean().max())
+            max_prob_list.append(mu1.max().item())
+            max_prob_list.append(mu2.max().item())
+            prob_25_list.append(mu1.topk(25).values[-1].item())
+            prob_25_list.append(mu2.topk(25).values[-1].item())
+            prob_50_list.append(mu1.topk(50).values[-1].item())
+            prob_50_list.append(mu2.topk(50).values[-1].item())
+            prob_100_list.append(mu1.topk(100).values[-1].item())
+            prob_100_list.append(mu2.topk(100).values[-1].item())
 
-    df = pd.DataFrame({"x": samples_list, "y": kl_list, "method": method_list})
+
+    df = pd.DataFrame({
+        "x": samples_list,
+        "y": kl_list,
+        "max": max_prob_list,
+        "25": prob_25_list,
+        "50": prob_50_list,
+        "100": prob_100_list,
+        "method": method_list,
+    })
     sns.lineplot(data=df, x="x", y="y", hue="method", errorbar="sd")
-    #sns.lineplot(data=df, x="x", y="y", hue="method")
-    #sns.scatter(data=df, x="x", y="y", hue="method")
-
     plt.title("Scatter Plot of Num Samples vs KL")
     plt.xlabel("Num samples")
     plt.ylabel("KL")
     plt.legend()
     plt.tight_layout()
     plt.savefig("figures/truncated_samples_kl.png")
+    plt.clf()
+
+
+    sns.lineplot(data=df, x="x", y="max", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.max().item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs max probability estimation")
+    plt.xlabel("Num samples")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("figures/truncated_samples_max.png")
+    plt.clf()
+
+    sns.lineplot(data=df, x="x", y="25", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(25).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 25th rank probability estimation")
+    plt.xlabel("Num samples")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("figures/truncated_samples_25.png")
+    plt.clf()
+
+    sns.lineplot(data=df, x="x", y="50", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(50).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 50th rank probability estimation")
+    plt.xlabel("Num samples")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("figures/truncated_samples_50.png")
+    plt.clf()
+
+    sns.lineplot(data=df, x="x", y="100", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(100).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 100th rank probability estimation")
+    plt.xlabel("Num samples")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("figures/truncated_samples_100.png")
+    plt.clf()
