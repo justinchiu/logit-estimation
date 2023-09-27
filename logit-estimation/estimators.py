@@ -301,7 +301,7 @@ if __name__ == "__main__":
     gpt = "gpt2"
 
     USE_LLAMA = False
-    USE_LLAMA = True
+    #USE_LLAMA = True
 
     if not USE_LLAMA:
         model = gpt
