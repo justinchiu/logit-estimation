@@ -296,14 +296,19 @@ if __name__ == "__main__":
     import seaborn as sns
     import matplotlib.pyplot as plt
 
-    #llama = "meta-llama/Llama-2-7b-chat-hf"
-    llama = "meta-llama/Llama-2-7b-hf"
+    llama = "meta-llama/Llama-2-7b-chat-hf"
+    #llama = "meta-llama/Llama-2-7b-hf"
     gpt = "gpt2"
 
-    model = gpt
-    model_name = "gpt"
-    #model = llama
-    #model_name = "llama"
+    USE_LLAMA = False
+    USE_LLAMA = True
+
+    if not USE_LLAMA:
+        model = gpt
+        model_name = "gpt"
+    else:
+        model = llama
+        model_name = "llama"
     if model == llama:
         prefix = "[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>\nWrite me a story. [/INST]\n"
     else:
