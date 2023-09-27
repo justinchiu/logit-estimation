@@ -254,7 +254,7 @@ if __name__ == "__main__":
     true_dist = output.true_dist
 
     K = 2**14
-    tau = 2*K
+    tau = 4*K
 
     Ts = [32,64,128, 256]
 
