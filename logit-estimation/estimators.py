@@ -301,7 +301,7 @@ if __name__ == "__main__":
     gpt = "gpt2"
 
     USE_LLAMA = False
-    USE_LLAMA = True
+    #USE_LLAMA = True
 
     if not USE_LLAMA:
         model = gpt
@@ -329,7 +329,7 @@ if __name__ == "__main__":
     samples_list = []
     kl_list = []
     rmse_list = []
-    nrmse_list = []
+    rrmse_list = []
 
     max_prob_list = []
     prob_25_list = []
@@ -352,10 +352,10 @@ if __name__ == "__main__":
             rmse1 = (true_dist.probs - mu1).square().mean().sqrt().item()
             rmse2 = (true_dist.probs - mu2).square().mean().sqrt().item()
             rmse3 = (true_dist.probs - mu3).square().mean().sqrt().item()
-            import pdb; pdb.set_trace()
-            nrmse1 = ((true_dist.probs - mu1).square().mean().sqrt() / true_dist.probs.std()).item()
-            nrmse2 = ((true_dist.probs - mu2).square().mean().sqrt()).item()
-            nrmse3 = ((true_dist.probs - mu3).square().mean().sqrt()).item()
+            rrmse1 = ((true_dist.probs - mu1).abs() / true_dist.probs).mean().item()
+            rrmse2 = ((true_dist.probs - mu2).abs() / true_dist.probs).mean().item()
+            rrmse3 = ((true_dist.probs - mu3).abs() / true_dist.probs).mean().item()
+
 
             method_list.append("Truncate sample")
             method_list.append("Naive sample")
@@ -369,6 +369,9 @@ if __name__ == "__main__":
             rmse_list.append(rmse1)
             rmse_list.append(rmse2)
             rmse_list.append(rmse3)
+            rrmse_list.append(rrmse1)
+            rrmse_list.append(rrmse2)
+            rrmse_list.append(rrmse3)
             if kl1 < 0 or kl2 < 0 or kl3 < 0:
                 print(kl1, kl2, kl3)
                 #import pdb; pdb.set_trace()
@@ -394,6 +397,7 @@ if __name__ == "__main__":
         "x": samples_list,
         "kl": kl_list,
         "rmse": rmse_list,
+        "rrmse": rrmse_list,
         "max": max_prob_list,
         "25": prob_25_list,
         "50": prob_50_list,
@@ -411,12 +415,21 @@ if __name__ == "__main__":
     plt.clf()
 
     sns.lineplot(data=df, x="x", y="rmse", hue="method", errorbar="sd")
-    plt.title("Scatter Plot of Num Samples vs MSE")
+    plt.title("Scatter Plot of Num Samples vs RMSE")
     plt.xlabel("Num samples")
-    plt.ylabel("MSE")
+    plt.ylabel("RMSE")
     plt.legend()
     plt.tight_layout()
     plt.savefig(f"figures/{model_name}_truncated_samples_rmse.png")
+    plt.clf()
+
+    sns.lineplot(data=df, x="x", y="rrmse", hue="method", errorbar="sd")
+    plt.title("Scatter Plot of Num Samples vs Relative RMSE")
+    plt.xlabel("Num samples")
+    plt.ylabel("Relative RMSE")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f"figures/{model_name}_truncated_samples_rrmse.png")
     plt.clf()
 
 
