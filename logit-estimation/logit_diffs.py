@@ -162,7 +162,7 @@ def binary_search_openai(prefix, logit_bias, model, low=-0.5, high=0, eps=1e-3, 
     mid = (high + low) / 2
     while high > low + eps:
         # call to greedy
-        logit_bias[idx] = low
+        logit_bias[idx] = mid
         if complete(prefix, logit_bias, model)[0] == idx:
             high = mid
         else:

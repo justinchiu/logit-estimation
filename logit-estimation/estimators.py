@@ -1,10 +1,15 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import math
 import torch
+import numpy as np
+from scipy.special import logsumexp
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.distributions import Categorical, kl_divergence
 
+
+np.seterr(all='raise')
 
 @dataclass
 class Output:
@@ -26,12 +31,18 @@ def construct_logit_bias_tensor(logit_bias_dict, vocab_size):
 
 class HfSampler(Sampler):
     def __init__(self, model):
-        self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
+        #self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
+        self.model = AutoModelForCausalLM.from_pretrained(model)
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.vocab_size = len(self.tokenizer)
         self.cached_logits = None
+        self.cached_prefix = None
 
     def sample(self, prefix, K, logit_bias=None, temperature=1):
+        if prefix != self.cached_prefix:
+            self.cached_logits = None
+            self.cached_prefix = prefix
+
         logits = (
             self.get_true_logits(prefix, K)
             if self.cached_logits is None
@@ -42,7 +53,7 @@ class HfSampler(Sampler):
 
         true_dist = Categorical(logits=logits)
         return Output(
-            samples = true_dist.sample_n(K),
+            samples = true_dist.sample_n(K).tolist() if temperature > 0 else None,
             argmax = logits.argmax().item(),
             true_dist = true_dist,
         )
@@ -63,28 +74,25 @@ class HfSampler(Sampler):
 
 
 class Estimator:
-    def __init__(self, vocab_size, threshold = 10, estimated_logits=None, idxs=None):
+    def __init__(self, vocab_size, threshold = 50, estimated_logits=None, idxs=None):
         self.vocab_size = vocab_size
         self.samples = []
-        self.weights = []
-        self.Zs = torch.zeros(vocab_size, dtype=torch.float64)
-        self.counts = torch.zeros(vocab_size, dtype=torch.int32)
+        self.log_weights = []
+        #self.Zs = torch.zeros(vocab_size, dtype=torch.float64)
+        #self.counts = torch.zeros(vocab_size, dtype=torch.int64)
+        self.Zs = np.zeros(vocab_size, dtype=np.float64)
+        self.counts = np.zeros(vocab_size, dtype=np.int64)
         self.threshold = threshold
 
         # already estimated
         self.estimated_logits = estimated_logits
         self.idxs = idxs
 
-    def add_sample(self, sample_output, weight=1., allowed_words=None):
+    def add_sample(self, sample_output, log_weight=0., allowed_words=None):
         for sample in sample_output.samples:
             self.samples.append(sample)
-            self.weights.append(weight)
-        self.counts.scatter_add_(
-            0,
-            sample_output.samples,
-            torch.ones_like(sample_output.samples, dtype=torch.int32),
-        )
-        #Z = weight * len(sample_output.samples)
+            self.log_weights.append(log_weight)
+        np.add.at(self.counts, sample_output.samples, 1)
         Z = len(sample_output.samples)
         if allowed_words is not None:
             self.Zs[allowed_words] += Z
@@ -94,14 +102,23 @@ class Estimator:
     def mean(self):
         if len(self.samples) == 0:
             return None
-        probs = torch.zeros(self.vocab_size) + 1e-20 # smoothing
-        probs.scatter_add_(
-            0,
-            torch.tensor(self.samples, dtype=torch.int64),
-            torch.tensor(self.weights),
-        )
-        probs /= self.Zs
 
+        s = np.array(self.samples, dtype=np.int64)
+        w = np.array(self.log_weights, dtype=np.float64)
+
+        lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
+        np.logaddexp.at(lp, s, w)
+        # is this numerically stable?
+         
+        # try a really slow version
+        #import pdb; pdb.set_trace()
+
+        log_probs = lp - np.log(self.Zs)
+        #if logsumexp(log_probs) > 0:
+        #    import pdb; pdb.set_trace()
+        return log_probs
+
+        # ignore this for now then
         if self.estimated_logits is not None:
             #Z1 = probs.log().logsumexp(0)
             #Z2 = self.estimated_logits.logsumexp(0)
@@ -113,19 +130,20 @@ class Estimator:
     def weight(self):
         mean = self.mean()
         words = self.confident_words()
-        return 1. - mean[words].sum() if mean is not None else 1., words
+        if mean is not None and len(words) > 0:
+            log_mass = logsumexp(mean[words])
+            if log_mass >= 0:
+                return None, words
+            return math.log(1 - math.exp(log_mass)), words
+        else:
+            return 0, words
 
     def confident_words(self):
-        words = (self.counts > self.threshold).nonzero()[:,0].tolist()
+        words = (self.counts > self.threshold).nonzero()[0].tolist()
         return words
-        return (
-            list(set(words + self.idxs))
-            if self.idxs is not None
-            else words
-        )
 
 
-def binary_search(sampler, prefix, logit_bias, low=-0.5, high=0, eps=1e-5):
+def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
     logit_bias = logit_bias.copy()
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
@@ -155,12 +173,14 @@ def estimate(sampler, prefix, K, T, threshold):
     estimator = Estimator(sampler.vocab_size, threshold)
     for t in range(T):
         weight, words = estimator.weight()
+        if weight is None:
+            break
         #logit_bias = {word: -100 for word in words}
         logit_bias = {word: -1000 for word in words}
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
-    return estimator, K*T
+    return estimator, K*(t+1)
 
 def naive_estimate(sampler, prefix, K):
     estimator = Estimator(sampler.vocab_size)
@@ -174,7 +194,7 @@ def search(sampler, prefix, topk, logit_bias, bias=-100):
     diffs = []
     idxs = []
     total_calls = 0
-    for _ in range(16):
+    for _ in range(topk):
         logit_diff, idx, num_calls = binary_search(sampler, prefix, logit_bias)
         logit_bias[idx] = bias
         diffs.append(logit_diff)
@@ -187,16 +207,22 @@ def search(sampler, prefix, topk, logit_bias, bias=-100):
 def search_then_estimate(sampler, prefix, K, T, threshold):
     idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 16, dict())
 
-    bias = -100
+    bias = -1000
     estimator = Estimator(sampler.vocab_size, threshold,
         estimated_logits=estimated_logits, idxs=idxs)
-    for t in range(T):
+
+    remaining_calls = K*T - total_calls
+    newT = remaining_calls // K
+    for t in range(newT):
         weight, words = estimator.weight()
+        if weight is None:
+            break
         logit_bias = {word: bias for word in words}
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
-    return estimator, total_calls + K*T
+    return estimator, total_calls + K * (t+1)
+
 
 if __name__ == "__main__":
     import pandas as pd
@@ -218,22 +244,21 @@ if __name__ == "__main__":
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
 
-    #K = 1024
-    K = 512
-    tau = K // 2
+    K = 2**14
+    tau = 2*K
 
-    Ts = [2, 4, 8, 16]
-    #Ts = [8, 16, 32, 64]
+    Ts = [32,64,128, 256]
 
     method_list = []
     samples_list = []
     kl_list = []
+    mse_list = []
 
     max_prob_list = []
-    prob_5_list = []
-    prob_10_list = []
-    prob_20_list = []
-    prob_30_list = []
+    prob_25_list = []
+    prob_50_list = []
+    prob_100_list = []
+    prob_500_list = []
 
     for _ in range(10):
         for T in Ts:
@@ -241,12 +266,15 @@ if __name__ == "__main__":
             e1, c1 = estimate(sampler, prefix, K, T, tau)
             e2, c2 = naive_estimate(sampler, prefix, K*T)
             e3, c3 = search_then_estimate(sampler, prefix, K, T, tau)
-            mu1 = e1.mean()
-            mu2 = e2.mean()
-            mu3 = e3.mean()
+            mu1 = torch.tensor(np.exp(e1.mean()))
+            mu2 = torch.tensor(np.exp(e2.mean()))
+            mu3 = torch.tensor(np.exp(e3.mean()))
             kl1 = kl_divergence(true_dist, Categorical(probs=mu1)).item()
             kl2 = kl_divergence(true_dist, Categorical(probs=mu2)).item()
             kl3 = kl_divergence(true_dist, Categorical(probs=mu3)).item()
+            mse1 = (true_dist.probs - mu1).square().mean().item()
+            mse2 = (true_dist.probs - mu2).square().mean().item()
+            mse3 = (true_dist.probs - mu3).square().mean().item()
 
             method_list.append("Truncate sample")
             method_list.append("Naive sample")
@@ -257,41 +285,57 @@ if __name__ == "__main__":
             kl_list.append(kl1)
             kl_list.append(kl2)
             kl_list.append(kl3)
+            mse_list.append(mse1)
+            mse_list.append(mse2)
+            mse_list.append(mse3)
+            if kl1 < 0 or kl2 < 0 or kl3 < 0:
+                print(kl1, kl2, kl3)
+                #import pdb; pdb.set_trace()
 
             max_prob_list.append(mu1.max().item())
             max_prob_list.append(mu2.max().item())
             max_prob_list.append(mu3.max().item())
-            prob_5_list.append(mu1.topk(5).values[-1].item())
-            prob_5_list.append(mu2.topk(5).values[-1].item())
-            prob_5_list.append(mu3.topk(5).values[-1].item())
-            prob_10_list.append(mu1.topk(10).values[-1].item())
-            prob_10_list.append(mu2.topk(10).values[-1].item())
-            prob_10_list.append(mu3.topk(10).values[-1].item())
-            prob_20_list.append(mu1.topk(20).values[-1].item())
-            prob_20_list.append(mu2.topk(20).values[-1].item())
-            prob_20_list.append(mu3.topk(20).values[-1].item())
-            prob_30_list.append(mu1.topk(30).values[-1].item())
-            prob_30_list.append(mu2.topk(30).values[-1].item())
-            prob_30_list.append(mu3.topk(30).values[-1].item())
+            prob_25_list.append(mu1.topk(25).values[-1].item())
+            prob_25_list.append(mu2.topk(25).values[-1].item())
+            prob_25_list.append(mu3.topk(25).values[-1].item())
+            prob_50_list.append(mu1.topk(50).values[-1].item())
+            prob_50_list.append(mu2.topk(50).values[-1].item())
+            prob_50_list.append(mu3.topk(50).values[-1].item())
+            prob_100_list.append(mu1.topk(100).values[-1].item())
+            prob_100_list.append(mu2.topk(100).values[-1].item())
+            prob_100_list.append(mu3.topk(100).values[-1].item())
+            prob_500_list.append(mu1.topk(500).values[-1].item())
+            prob_500_list.append(mu2.topk(500).values[-1].item())
+            prob_500_list.append(mu3.topk(500).values[-1].item())
 
 
     df = pd.DataFrame({
         "x": samples_list,
-        "y": kl_list,
+        "kl": kl_list,
+        "mse": mse_list,
         "max": max_prob_list,
-        "5": prob_5_list,
-        "10": prob_10_list,
-        "20": prob_20_list,
-        "30": prob_30_list,
+        "25": prob_25_list,
+        "50": prob_50_list,
+        "100": prob_100_list,
+        "500": prob_500_list,
         "method": method_list,
     })
-    sns.lineplot(data=df, x="x", y="y", hue="method", errorbar="sd")
+    sns.lineplot(data=df, x="x", y="kl", hue="method", errorbar="sd")
     plt.title("Scatter Plot of Num Samples vs KL")
     plt.xlabel("Num samples")
     plt.ylabel("KL")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_kl.png")
+    plt.savefig(f"figures/{model}_truncated_samples_kl.png")
+    plt.clf()
+
+    sns.lineplot(data=df, x="x", y="mse", hue="method", errorbar="sd")
+    plt.title("Scatter Plot of Num Samples vs MSE")
+    plt.xlabel("Num samples")
+    plt.ylabel("MSE")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f"figures/{model}_truncated_samples_mse.png")
     plt.clf()
 
 
@@ -302,45 +346,45 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_max.png")
+    plt.savefig(f"figures/{model}_truncated_samples_max.png")
     plt.clf()
 
-    sns.lineplot(data=df, x="x", y="5", hue="method", errorbar="sd")
-    plt.axhline(y=true_dist.probs.topk(5).values[-1].item(), color="red", linestyle="--")
-    plt.title("Scatter Plot of Num Samples vs 5th rank probability estimation")
+    sns.lineplot(data=df, x="x", y="25", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(25).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 25th rank probability estimation")
     plt.xlabel("Num samples")
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_5.png")
+    plt.savefig(f"figures/{model}_truncated_samples_25.png")
     plt.clf()
 
-    sns.lineplot(data=df, x="x", y="10", hue="method", errorbar="sd")
-    plt.axhline(y=true_dist.probs.topk(10).values[-1].item(), color="red", linestyle="--")
-    plt.title("Scatter Plot of Num Samples vs 10th rank probability estimation")
+    sns.lineplot(data=df, x="x", y="50", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(50).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 50th rank probability estimation")
     plt.xlabel("Num samples")
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_10.png")
+    plt.savefig(f"figures/{model}_truncated_samples_50.png")
     plt.clf()
 
-    sns.lineplot(data=df, x="x", y="20", hue="method", errorbar="sd")
-    plt.axhline(y=true_dist.probs.topk(20).values[-1].item(), color="red", linestyle="--")
-    plt.title("Scatter Plot of Num Samples vs 20th rank probability estimation")
+    sns.lineplot(data=df, x="x", y="100", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(100).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 100th rank probability estimation")
     plt.xlabel("Num samples")
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_20.png")
+    plt.savefig(f"figures/{model}_truncated_samples_100.png")
     plt.clf()
 
-    sns.lineplot(data=df, x="x", y="30", hue="method", errorbar="sd")
-    plt.axhline(y=true_dist.probs.topk(30).values[-1].item(), color="red", linestyle="--")
-    plt.title("Scatter Plot of Num Samples vs 30th rank probability estimation")
+    sns.lineplot(data=df, x="x", y="500", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(500).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 500th rank probability estimation")
     plt.xlabel("Num samples")
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("figures/truncated_samples_30.png")
+    plt.savefig(f"figures/{model}_truncated_samples_500.png")
     plt.clf()

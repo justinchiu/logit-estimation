@@ -19,6 +19,7 @@ seaborn = "*"
 transformers = "*"
 tenacity = "*"
 torch = "*"
+scipy = "*"
 
 [build-system]
 requires = ["poetry-core"]
