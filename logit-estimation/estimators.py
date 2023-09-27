@@ -52,6 +52,7 @@ class HfSampler(Sampler):
             logits = logits + construct_logit_bias_tensor(logit_bias, len(logits))
 
         true_dist = Categorical(logits=logits)
+
         return Output(
             samples = true_dist.sample_n(K).tolist() if temperature > 0 else None,
             argmax = logits.argmax().item(),
@@ -155,6 +156,10 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
         low *= 2
         logit_bias[idx] = low
         num_calls += 1
+        if low < -1e3:
+            # likely a -inf for the next word
+            import pdb; pdb.set_trace()
+            return float("-inf", idx, num_calls)
 
     # improve estimate
     mid = (high + low) / 2
@@ -229,12 +234,16 @@ if __name__ == "__main__":
     import seaborn as sns
     import matplotlib.pyplot as plt
 
-    llama = "meta-llama/Llama-2-7b-chat-hf"
+    #llama = "meta-llama/Llama-2-7b-chat-hf"
+    llama = "meta-llama/Llama-2-7b-hf"
     gpt = "gpt2"
 
-    model = gpt
+    #model = gpt
+    #model_name = "gpt"
+    model = llama
+    model_name = "llama"
     if model == llama:
-        prefix = "[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>\nHi [/INST]"
+        prefix = "[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>\nWrite me a story. [/INST]\n"
     else:
         prefix = "hi"
 
@@ -326,7 +335,7 @@ if __name__ == "__main__":
     plt.ylabel("KL")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_kl.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_kl.png")
     plt.clf()
 
     sns.lineplot(data=df, x="x", y="mse", hue="method", errorbar="sd")
@@ -335,7 +344,7 @@ if __name__ == "__main__":
     plt.ylabel("MSE")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_mse.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_mse.png")
     plt.clf()
 
 
@@ -346,7 +355,7 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_max.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_max.png")
     plt.clf()
 
     sns.lineplot(data=df, x="x", y="25", hue="method", errorbar="sd")
@@ -356,7 +365,7 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_25.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_25.png")
     plt.clf()
 
     sns.lineplot(data=df, x="x", y="50", hue="method", errorbar="sd")
@@ -366,7 +375,7 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_50.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_50.png")
     plt.clf()
 
     sns.lineplot(data=df, x="x", y="100", hue="method", errorbar="sd")
@@ -376,7 +385,7 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_100.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_100.png")
     plt.clf()
 
     sns.lineplot(data=df, x="x", y="500", hue="method", errorbar="sd")
@@ -386,5 +395,5 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model}_truncated_samples_500.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_500.png")
     plt.clf()
