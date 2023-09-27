@@ -336,6 +336,7 @@ if __name__ == "__main__":
     prob_50_list = []
     prob_100_list = []
     prob_500_list = []
+    prob_1000_list = []
 
     for _ in range(10):
         for T in Ts:
@@ -391,6 +392,9 @@ if __name__ == "__main__":
             prob_500_list.append(mu1.topk(500).values[-1].item())
             prob_500_list.append(mu2.topk(500).values[-1].item())
             prob_500_list.append(mu3.topk(500).values[-1].item())
+            prob_1000_list.append(mu1.topk(1000).values[-1].item())
+            prob_1000_list.append(mu2.topk(1000).values[-1].item())
+            prob_1000_list.append(mu3.topk(1000).values[-1].item())
 
 
     df = pd.DataFrame({
@@ -403,6 +407,7 @@ if __name__ == "__main__":
         "50": prob_50_list,
         "100": prob_100_list,
         "500": prob_500_list,
+        "1000": prob_1000_list,
         "method": method_list,
     })
     sns.lineplot(data=df, x="x", y="kl", hue="method", errorbar="sd")
@@ -481,4 +486,14 @@ if __name__ == "__main__":
     plt.legend()
     plt.tight_layout()
     plt.savefig(f"figures/{model_name}_truncated_samples_500.png")
+    plt.clf()
+
+    sns.lineplot(data=df, x="x", y="1000", hue="method", errorbar="sd")
+    plt.axhline(y=true_dist.probs.topk(1000).values[-1].item(), color="red", linestyle="--")
+    plt.title("Scatter Plot of Num Samples vs 1000th rank probability estimation")
+    plt.xlabel("Num samples")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(f"figures/{model_name}_truncated_samples_1000.png")
     plt.clf()
