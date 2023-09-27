@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import sys
 import math
 import torch
 import numpy as np
@@ -9,7 +10,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.distributions import Categorical, kl_divergence
 
 
-np.seterr(all='raise')
+#np.seterr(all='raise')
 
 @dataclass
 class Output:
@@ -166,7 +167,9 @@ class Estimator:
         s = np.array(self.samples, dtype=np.int64)
         w = np.array(self.log_weights, dtype=np.float64)
 
-        lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
+        #lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
+        #lp = np.full((self.vocab_size,), -sys.float_info.max, dtype=np.float64)
+        lp = np.full((self.vocab_size,), -1e12, dtype=np.float64)
         np.logaddexp.at(lp, s, w)
         # is this numerically stable?
          
