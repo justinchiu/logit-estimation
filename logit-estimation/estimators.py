@@ -67,8 +67,12 @@ class HfSampler(Sampler):
             return_dict_in_generate=True,
             output_scores=True,
             do_sample=True,
-            #num_return_sequences=1,
+            num_return_sequences=1,
+            top_p=1.0,
+            top_k=0,
+            num_beams=1,
         )
+        #import pdb; pdb.set_trace()
         logits = outputs.scores[0][0].log_softmax(0)
         self.cached_logits = logits
         return logits
