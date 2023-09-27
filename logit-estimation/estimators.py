@@ -73,6 +73,61 @@ class HfSampler(Sampler):
         self.cached_logits = logits
         return logits
 
+class GptSampler(Sampler):
+    def __init__(self, model):
+        #self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
+        self.model = model
+        self.vocab_size = 100000
+
+    def sample(self, prefix, K, logit_bias=None, temperature=1, system=None):
+        model = self.model
+        system = "You are a helpful assistant." if system is None else system
+
+        enc = tiktoken.encoding_for_model(model)
+        if model == "gpt-3.5-turbo-instruct":
+            response = openai.Completion.create(
+                model=model,
+                prompt=prefix,
+                temperature=temperature,
+                max_tokens=1,
+                logit_bias=logit_bias,
+                n=K,
+            )
+            output = response.choices[0].text
+            eos_idx = enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>", "<|im_start|>"})[0]
+            outputs = [choice.text for choice in response.choices]
+        else:
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prefix},
+                ],
+                temperature=temperature,
+                max_tokens=1,
+                logit_bias=logit_bias,
+                n=K,
+            )
+            output = response.choices[0].message["content"]
+            outputs = [choice.message["content"] for choice in response.choices]
+            eos_idx = enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>", "<|im_start|>"})[0]
+
+        if response.choices[0].finish_reason == "length":
+            idx = enc.encode(output)[0]
+        elif response.choices[0].finish_reason == "stop":
+            idx = eos_idx
+        else:
+            import pdb; pdb.set_trace()
+
+        if temperature > 0:
+            samples = [enc.encode(output) for output in outputs]
+
+        return Output(
+            samples = samples if temperature > 0 else None,
+            argmax = idx if temperature == 0 else None,
+            true_dist = None,
+        )
+
 
 class Estimator:
     def __init__(self, vocab_size, threshold = 50, estimated_logits=None, idxs=None):
@@ -238,10 +293,10 @@ if __name__ == "__main__":
     llama = "meta-llama/Llama-2-7b-hf"
     gpt = "gpt2"
 
-    #model = gpt
-    #model_name = "gpt"
-    model = llama
-    model_name = "llama"
+    model = gpt
+    model_name = "gpt"
+    #model = llama
+    #model_name = "llama"
     if model == llama:
         prefix = "[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>\nWrite me a story. [/INST]\n"
     else:
