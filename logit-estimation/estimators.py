@@ -328,7 +328,8 @@ if __name__ == "__main__":
     method_list = []
     samples_list = []
     kl_list = []
-    mse_list = []
+    rmse_list = []
+    nrmse_list = []
 
     max_prob_list = []
     prob_25_list = []
@@ -348,9 +349,13 @@ if __name__ == "__main__":
             kl1 = kl_divergence(true_dist, Categorical(probs=mu1)).item()
             kl2 = kl_divergence(true_dist, Categorical(probs=mu2)).item()
             kl3 = kl_divergence(true_dist, Categorical(probs=mu3)).item()
-            mse1 = (true_dist.probs - mu1).square().mean().item()
-            mse2 = (true_dist.probs - mu2).square().mean().item()
-            mse3 = (true_dist.probs - mu3).square().mean().item()
+            rmse1 = (true_dist.probs - mu1).square().mean().sqrt().item()
+            rmse2 = (true_dist.probs - mu2).square().mean().sqrt().item()
+            rmse3 = (true_dist.probs - mu3).square().mean().sqrt().item()
+            import pdb; pdb.set_trace()
+            nrmse1 = ((true_dist.probs - mu1).square().mean().sqrt() / true_dist.probs.std()).item()
+            nrmse2 = ((true_dist.probs - mu2).square().mean().sqrt()).item()
+            nrmse3 = ((true_dist.probs - mu3).square().mean().sqrt()).item()
 
             method_list.append("Truncate sample")
             method_list.append("Naive sample")
@@ -361,9 +366,9 @@ if __name__ == "__main__":
             kl_list.append(kl1)
             kl_list.append(kl2)
             kl_list.append(kl3)
-            mse_list.append(mse1)
-            mse_list.append(mse2)
-            mse_list.append(mse3)
+            rmse_list.append(rmse1)
+            rmse_list.append(rmse2)
+            rmse_list.append(rmse3)
             if kl1 < 0 or kl2 < 0 or kl3 < 0:
                 print(kl1, kl2, kl3)
                 #import pdb; pdb.set_trace()
@@ -388,7 +393,7 @@ if __name__ == "__main__":
     df = pd.DataFrame({
         "x": samples_list,
         "kl": kl_list,
-        "mse": mse_list,
+        "rmse": rmse_list,
         "max": max_prob_list,
         "25": prob_25_list,
         "50": prob_50_list,
@@ -405,13 +410,13 @@ if __name__ == "__main__":
     plt.savefig(f"figures/{model_name}_truncated_samples_kl.png")
     plt.clf()
 
-    sns.lineplot(data=df, x="x", y="mse", hue="method", errorbar="sd")
+    sns.lineplot(data=df, x="x", y="rmse", hue="method", errorbar="sd")
     plt.title("Scatter Plot of Num Samples vs MSE")
     plt.xlabel("Num samples")
     plt.ylabel("MSE")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model_name}_truncated_samples_mse.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_rmse.png")
     plt.clf()
 
 
