@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.distributions import Categorical, kl_divergence
 
 
-#np.seterr(all='raise')
+np.seterr(all='raise')
 
 @dataclass
 class Output:
@@ -139,8 +139,7 @@ class Estimator:
         self.vocab_size = vocab_size
         self.samples = []
         self.log_weights = []
-        #self.Zs = torch.zeros(vocab_size, dtype=torch.float64)
-        #self.counts = torch.zeros(vocab_size, dtype=torch.int64)
+
         self.Zs = np.zeros(vocab_size, dtype=np.float64)
         self.counts = np.zeros(vocab_size, dtype=np.int64)
         self.threshold = threshold
@@ -167,9 +166,10 @@ class Estimator:
         s = np.array(self.samples, dtype=np.int64)
         w = np.array(self.log_weights, dtype=np.float64)
 
-        #lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
+        lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
         #lp = np.full((self.vocab_size,), -sys.float_info.max, dtype=np.float64)
-        lp = np.full((self.vocab_size,), -1e12, dtype=np.float64)
+        #lp = np.full((self.vocab_size,), -1e12, dtype=np.float64)
+        #lp = np.full((self.vocab_size,), -1e2, dtype=np.float64)
         np.logaddexp.at(lp, s, w)
         # is this numerically stable?
          
@@ -177,18 +177,12 @@ class Estimator:
         #import pdb; pdb.set_trace()
 
         log_probs = lp - np.log(self.Zs)
-        #if logsumexp(log_probs) > 0:
-        #    import pdb; pdb.set_trace()
-        return log_probs
 
-        # ignore this for now then
         if self.estimated_logits is not None:
-            #Z1 = probs.log().logsumexp(0)
-            #Z2 = self.estimated_logits.logsumexp(0)
-            P = probs[self.idxs].sum()
-            #import pdb; pdb.set_trace()
-            #probs[self.idxs] = self.estimated_logits.softmax(0) * P
-        return probs / probs.sum()
+            Zsample = logsumexp(log_probs[self.idxs])
+            Zhat = logsumexp(self.estimated_logits)
+            log_probs[self.idxs] = self.estimated_logits - Zhat + Zsample
+        return log_probs
 
     def weight(self):
         mean = self.mean()
@@ -205,11 +199,21 @@ class Estimator:
         words = (self.counts > self.threshold).nonzero()[0].tolist()
         return words
 
+def query_ordering(sampler, prefix, bias=-1000):
+    vocab_size = sampler.vocab_size
+    logit_bias = dict()
+    ordering = []
+    for i in range(vocab_size):
+        idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+        logit_bias[idx] = bias
+        ordering.append(idx)
+    return ordering
 
 def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
     logit_bias = logit_bias.copy()
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
+    idx_lower = None
 
     #print(sampler.cached_logits.topk(2).values[0] - sampler.cached_logits.topk(2).values[1])
     num_calls = 1
@@ -227,13 +231,15 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
     mid = (high + low) / 2
     while high > low + eps:
         logit_bias[idx] = mid
-        if sampler.sample(prefix, 1, logit_bias, temperature=0).argmax == idx:
+        idx2 = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+        if idx2 == idx:
             high = mid
         else:
             low = mid
+            idx_lower = idx2
         mid = (high + low) / 2
         num_calls += 1
-    return mid, idx, num_calls
+    return mid, idx, num_calls, idx_lower
 
 
 def estimate(sampler, prefix, K, T, threshold):
@@ -257,22 +263,45 @@ def naive_estimate(sampler, prefix, K):
 
 def search(sampler, prefix, topk, logit_bias, bias=-100):
     logit_bias = logit_bias.copy()
+    highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
 
-    diffs = []
-    idxs = []
+    diffs = [0]
+    idxs = [highest_idx]
     total_calls = 0
     for _ in range(topk):
-        logit_diff, idx, num_calls = binary_search(sampler, prefix, logit_bias)
+        logit_diff, idx, num_calls, lower_idx = binary_search(sampler, prefix, logit_bias)
         logit_bias[idx] = bias
         diffs.append(logit_diff)
-        idxs.append(idx)
+        idxs.append(lower_idx)
         total_calls += num_calls
+        print(total_calls, _, topk)
 
-    estimated_logits = torch.tensor(diffs).cumsum(0)
+    estimated_logits = np.array(diffs, dtype=np.float64).cumsum()
+    return idxs, estimated_logits, logit_bias, total_calls
+
+def diffsearch(sampler, prefix, topk, logit_bias, bias=-1000):
+    logit_bias = logit_bias.copy()
+    highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+
+    diffs = [0]
+    idxs = [highest_idx]
+    total_calls = 1
+    logit_diff = 0
+    for _ in range(topk):
+        logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff)
+        logit_bias[idx_lower] = bias
+        diffs.append(logit_diff)
+        idxs.append(idx_lower)
+        total_calls += num_calls
+        print(total_calls, _, topk)
+
+    estimated_logits = np.array(diffs, dtype=np.float64)
     return idxs, estimated_logits, logit_bias, total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
-    idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 16, dict())
+    #idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 16, dict())
+    #idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 64, dict())
+    idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 128, dict())
 
     bias = -1000
     estimator = Estimator(sampler.vocab_size, threshold,
@@ -280,7 +309,10 @@ def search_then_estimate(sampler, prefix, K, T, threshold):
 
     remaining_calls = K*T - total_calls
     newT = remaining_calls // K
+    #import pdb; pdb.set_trace()
+    #newT = T
     for t in range(newT):
+        print(t, newT)
         weight, words = estimator.weight()
         if weight is None:
             break
@@ -288,7 +320,9 @@ def search_then_estimate(sampler, prefix, K, T, threshold):
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
+    return estimator, K*T
     return estimator, total_calls + K * (t+1)
+
 
 
 if __name__ == "__main__":
@@ -320,10 +354,16 @@ if __name__ == "__main__":
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
 
+    idxs1, estimated_logits1, logit_bias1, total_calls1 = diffsearch(sampler, prefix, 2**14, dict())
+    idxs2, estimated_logits2, logit_bias2, total_calls2 = search(sampler, prefix, 2**14, dict())
+    import pdb; pdb.set_trace()
+
     K = 2**14
-    tau = 4*K
+    K = 2**10
+    tau = 2*K
 
     Ts = [32,64,128, 256]
+    Ts = [16,32,64]
 
     method_list = []
     samples_list = []
@@ -356,7 +396,6 @@ if __name__ == "__main__":
             rrmse1 = ((true_dist.probs - mu1).abs() / true_dist.probs).mean().item()
             rrmse2 = ((true_dist.probs - mu2).abs() / true_dist.probs).mean().item()
             rrmse3 = ((true_dist.probs - mu3).abs() / true_dist.probs).mean().item()
-
 
             method_list.append("Truncate sample")
             method_list.append("Naive sample")
