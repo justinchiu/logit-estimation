@@ -66,7 +66,7 @@ for idx in track(example_idxs):
             )
             idxs_diff.append(idx)
             predictions_diff.append(tokenizer.batch_decode(output)[0])
-            references_diff.append(prefix)
+            references_diff.append([prefix])
         elif "mc" in f:
             output = trainer.generate(
                 inputs={
@@ -82,7 +82,7 @@ for idx in track(example_idxs):
             )
             idxs_mc.append(idx)
             predictions_mc.append(tokenizer.batch_decode(output)[0])
-            references_mc.append(prefix)
+            references_mc.append([prefix])
         else:
             output = trainer.generate(
                 inputs={
@@ -98,8 +98,9 @@ for idx in track(example_idxs):
             )
             idxs.append(idx)
             predictions.append(tokenizer.batch_decode(output)[0])
-            references.append(prefix)
+            references.append([prefix])
     break
+    # for debugging
 
 bleu = evaluate.load("bleu")
 bleu_score = bleu.compute(predictions=predictions,reference=references)
