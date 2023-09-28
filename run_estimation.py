@@ -11,6 +11,7 @@ index = random.randint(0, len(dataset))
 d = dataset[index]
 #prefix = f"[INST] <<SYS>>\n{d['system']}\n<</SYS>>\n {d['user']} [/INST]"
 prefix = d["system"] + "\n\n" + d["user"]
+import pdb; pdb.set_trace()
 
 #model = "meta-llama/Llama-2-7b-chat-hf"
 model = "meta-llama/Llama-2-7b-hf"
