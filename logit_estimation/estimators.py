@@ -591,5 +591,5 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-   plt.savefig(f"figures/{model_name}_truncated_samples_1000.png")
+    plt.savefig(f"figures/{model_name}_truncated_samples_1000.png")
     plt.clf()
