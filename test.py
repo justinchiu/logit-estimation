@@ -46,7 +46,7 @@ for idx in track(example_idxs):
     for f in ex_files:
         f = str(f)
         logprobsnp = np.load(f)
-        logprobs = torch.zeros((1, vocab_size), dtype=torch.float32)
+        logprobs = torch.zeros((1, padded_vocab_size), dtype=torch.float32)
         logprobs[:len(logprobsnp)] = logprobsnp
         if "diff" in f:
             output = trainer.generate(
