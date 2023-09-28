@@ -308,28 +308,37 @@ def search_then_estimate(sampler, prefix, K, T, threshold):
         estimated_logits=estimated_logits, idxs=idxs)
 
     remaining_calls = K*T - total_calls
-    sample_output = sampler.sample(prefix, remaining_calls, logit_bias)
-    estimator.add_sample(sample_output)
-    return estimator, K*T
-    """
     newT = remaining_calls // K
-    #import pdb; pdb.set_trace()
-    #newT = T
     for t in range(newT):
         print(t, newT)
         weight, words = estimator.weight()
         if weight is None:
             break
         logit_bias = {word: bias for word in words}
-        logit_bias = dict()
-        weight = 0.
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
-    #return estimator, K*T
-    return estimator, total_calls + K * (t+1)
-    """
 
+    weight, words = estimator.weight()
+    logit_bias = {word: bias for word in words}
+    if weight is not None:
+        sample_output = sampler.sample(prefix, remaining_calls % K, logit_bias)
+        allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
+        estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
+
+    return estimator, K*T
+
+def search_then_sample(sampler, prefix, K, T, threshold):
+    idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128, dict())
+
+    bias = -1000
+    estimator = Estimator(sampler.vocab_size, threshold,
+        estimated_logits=estimated_logits, idxs=idxs)
+
+    remaining_calls = K*T - total_calls
+    sample_output = sampler.sample(prefix, remaining_calls)
+    estimator.add_sample(sample_output)
+    return estimator, K*T
 
 
 if __name__ == "__main__":
@@ -351,15 +360,33 @@ if __name__ == "__main__":
         model = llama
         model_name = "llama"
     if model == llama:
-        prefix = "[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>\nWrite me a story. [/INST]\n"
+        from datasets import load_dataset
+        dataset = load_dataset("wentingzhao/one-million-instructions")
+        d = dataset["train"][0]
+        prefix = f"[INST] <<SYS>>\n{d['system']}\n<</SYS>>\n {d['user']} [/INST]"
     else:
         prefix = "hi"
+
 
 
     # test sampling
     sampler = HfSampler(model)
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
+
+
+    """
+    encoded_prompt = sampler.tokenizer(prefix, return_tensors="pt")
+
+    out = sampler.model.generate(
+          input_ids=encoded_prompt["input_ids"],
+          attention_mask=encoded_prompt["attention_mask"],
+          do_sample=False,
+          max_length=64 + len(encoded_prompt[0]),
+    )
+
+    import pdb; pdb.set_trace()
+    """
 
     """
     idxs1, estimated_logits1, logit_bias1, total_calls1 = diffsearch(sampler, prefix, 2**14, dict())
@@ -391,55 +418,57 @@ if __name__ == "__main__":
         for T in Ts:
             # test estimation
             #e1, c1 = estimate(sampler, prefix, K, T, tau)
+            e1, c1 = search_then_sample(sampler, prefix, K, T, tau)
             e2, c2 = naive_estimate(sampler, prefix, K*T)
             e3, c3 = search_then_estimate(sampler, prefix, K, T, tau)
-            #mu1 = torch.tensor(np.exp(e1.mean()))
+            mu1 = torch.tensor(np.exp(e1.mean()))
             mu2 = torch.tensor(np.exp(e2.mean()))
             mu3 = torch.tensor(np.exp(e3.mean()))
-            #kl1 = kl_divergence(true_dist, Categorical(probs=mu1)).item()
+            kl1 = kl_divergence(true_dist, Categorical(probs=mu1)).item()
             kl2 = kl_divergence(true_dist, Categorical(probs=mu2)).item()
             kl3 = kl_divergence(true_dist, Categorical(probs=mu3)).item()
-            #rmse1 = (true_dist.probs - mu1).square().mean().sqrt().item()
+            rmse1 = (true_dist.probs - mu1).square().mean().sqrt().item()
             rmse2 = (true_dist.probs - mu2).square().mean().sqrt().item()
             rmse3 = (true_dist.probs - mu3).square().mean().sqrt().item()
-            #rrmse1 = ((true_dist.probs - mu1).abs() / true_dist.probs).mean().item()
+            rrmse1 = ((true_dist.probs - mu1).abs() / true_dist.probs).mean().item()
             rrmse2 = ((true_dist.probs - mu2).abs() / true_dist.probs).mean().item()
             rrmse3 = ((true_dist.probs - mu3).abs() / true_dist.probs).mean().item()
 
             #method_list.append("Truncate sample")
-            method_list.append("Naive sample")
             method_list.append("Search then sample")
-            #samples_list.append(c1)
+            method_list.append("Naive sample")
+            method_list.append("Search then truncate sample")
+            samples_list.append(c1)
             samples_list.append(c2)
             samples_list.append(c3)
-            #kl_list.append(kl1)
+            kl_list.append(kl1)
             kl_list.append(kl2)
             kl_list.append(kl3)
-            #rmse_list.append(rmse1)
+            rmse_list.append(rmse1)
             rmse_list.append(rmse2)
             rmse_list.append(rmse3)
-            #rrmse_list.append(rrmse1)
+            rrmse_list.append(rrmse1)
             rrmse_list.append(rrmse2)
             rrmse_list.append(rrmse3)
             #if kl1 < 0 or kl2 < 0 or kl3 < 0:
             #    print(kl1, kl2, kl3)
 
-            #max_prob_list.append(mu1.max().item())
+            max_prob_list.append(mu1.max().item())
             max_prob_list.append(mu2.max().item())
             max_prob_list.append(mu3.max().item())
-            #prob_25_list.append(mu1.topk(25).values[-1].item())
+            prob_25_list.append(mu1.topk(25).values[-1].item())
             prob_25_list.append(mu2.topk(25).values[-1].item())
             prob_25_list.append(mu3.topk(25).values[-1].item())
-            #prob_50_list.append(mu1.topk(50).values[-1].item())
+            prob_50_list.append(mu1.topk(50).values[-1].item())
             prob_50_list.append(mu2.topk(50).values[-1].item())
             prob_50_list.append(mu3.topk(50).values[-1].item())
-            #prob_100_list.append(mu1.topk(100).values[-1].item())
+            prob_100_list.append(mu1.topk(100).values[-1].item())
             prob_100_list.append(mu2.topk(100).values[-1].item())
             prob_100_list.append(mu3.topk(100).values[-1].item())
-            #prob_500_list.append(mu1.topk(500).values[-1].item())
+            prob_500_list.append(mu1.topk(500).values[-1].item())
             prob_500_list.append(mu2.topk(500).values[-1].item())
             prob_500_list.append(mu3.topk(500).values[-1].item())
-            #prob_1000_list.append(mu1.topk(1000).values[-1].item())
+            prob_1000_list.append(mu1.topk(1000).values[-1].item())
             prob_1000_list.append(mu2.topk(1000).values[-1].item())
             prob_1000_list.append(mu3.topk(1000).values[-1].item())
 

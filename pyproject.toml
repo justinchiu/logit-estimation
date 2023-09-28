@@ -20,6 +20,7 @@ transformers = "*"
 tenacity = "*"
 torch = "*"
 scipy = "*"
+datasets = "*"
 
 [build-system]
 requires = ["poetry-core"]
