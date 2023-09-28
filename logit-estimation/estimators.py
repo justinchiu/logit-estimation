@@ -320,7 +320,7 @@ def search_then_estimate(sampler, prefix, K, T, threshold):
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
-    return estimator, K*T
+    #return estimator, K*T
     return estimator, total_calls + K * (t+1)
 
 
@@ -354,9 +354,11 @@ if __name__ == "__main__":
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
 
+    """
     idxs1, estimated_logits1, logit_bias1, total_calls1 = diffsearch(sampler, prefix, 2**14, dict())
     idxs2, estimated_logits2, logit_bias2, total_calls2 = search(sampler, prefix, 2**14, dict())
     import pdb; pdb.set_trace()
+    """
 
     K = 2**14
     K = 2**10
