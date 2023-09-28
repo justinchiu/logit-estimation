@@ -1,5 +1,20 @@
+from pathlib import Path
 import torch
 from vec2text import analyze_utils
+import datasets
+
+
+vector_path = Path("saved_logits")
+files = [x for x in vector_path.glob("*.npy") if x.is_file()]
+example_idxs = set([int(str(f.stem).split("-")[0]) for f in files])
+
+dataset = load_dataset("wentingzhao/one-million-instructions")["train"]
+
+
+import pdb; pdb.set_trace()
+
+
+
 
 experiment, trainer = analyze_utils.load_experiment_and_trainer_from_pretrained(
     "jxm/t5-base__llama-7b__one-million-paired-instructions",
@@ -8,10 +23,6 @@ experiment, trainer = analyze_utils.load_experiment_and_trainer_from_pretrained(
 trainer.suffix_ensemble = False
 trainer.model.use_frozen_embeddings_as_input = True
 trainer.args.per_device_eval_batch_size = 1
-#trainer.evaluate(
-#    eval_dataset=trainer.eval_dataset["one_million_instructions"].select(range(10))
-#)
-
 
 # vocab_size = trainer.embedder_tokenizer.vocab_size
 vocab_size = 32768
@@ -28,3 +39,5 @@ trainer.generate(
         "max_new_tokens": 1,
     },
 )
+
+

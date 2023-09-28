@@ -10,7 +10,7 @@ dataset = load_dataset("wentingzhao/one-million-instructions")["train"]
 index = random.randint(0, len(dataset))
 d = dataset[index]
 #prefix = f"[INST] <<SYS>>\n{d['system']}\n<</SYS>>\n {d['user']} [/INST]"
-prefix = d["user"]
+prefix = d["system"] + "\n\n" + d["user"]
 
 #model = "meta-llama/Llama-2-7b-chat-hf"
 model = "meta-llama/Llama-2-7b-hf"
