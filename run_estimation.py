@@ -20,8 +20,8 @@ idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, N,
 lp = np.full((sampler.vocab_size,), float("-inf"), dtype=np.float64)
 Zhat = logsumexp(estimated_logits)
 lp[idxs] = estimated_logits - Zhat
-np.save(f"saved_logits/{index}-diff.npy", lp)
+np.save(f"saved_logits/{index}-diff-{total_calls}.npy", lp)
 
 estimator, num_calls = naive_estimate(sampler, prefix, total_calls)
 log_probs = estimator.mean()
-np.save(f"saved_logits/{index}-mc.npy", log_probs)
+np.save(f"saved_logits/{index}-mc-{total_calls}.npy", log_probs)
