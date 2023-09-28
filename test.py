@@ -40,8 +40,8 @@ references_mc = []
 idxs = []
 predictions = []
 references = []
-#for idx in track(example_idxs):
-for idx in example_idxs:
+for idx in track(example_idxs):
+#for idx in example_idxs:
     example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
