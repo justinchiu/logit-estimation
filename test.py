@@ -4,10 +4,11 @@ from vec2text import analyze_utils
 from datasets import load_dataset
 import evaluate
 import numpy as np
+from rich.progress import track
 
 
 vector_path = Path("saved_logits")
-vector_path = Path("saved_logits_old")
+#vector_path = Path("saved_logits_old")
 files = [x for x in vector_path.glob("*.npy") if x.is_file()]
 example_idxs = set([int(str(f.stem).split("-")[0]) for f in files if "diff" in str(f)])
 
@@ -25,6 +26,8 @@ trainer.suffix_ensemble = False
 trainer.model.use_frozen_embeddings_as_input = True
 trainer.args.per_device_eval_batch_size = 1
 
+tokenizer = trainer.tokenizer
+
 # vocab_size = trainer.embedder_tokenizer.vocab_size
 padded_vocab_size = 32768
 
@@ -37,7 +40,8 @@ references_mc = []
 idxs = []
 predictions = []
 references = []
-for idx in example_idxs:
+for idx in track(example_idxs):
+#for idx in example_idxs:
     example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
@@ -45,8 +49,8 @@ for idx in example_idxs:
     for f in ex_files:
         f = str(f)
         logprobsnp = np.load(f)
-        logprobs = torch.zeros((1, vocab_size), dtype=torch.float32)
-        logprobs[:len(logprobsnp)] = logprobsnp
+        logprobs = torch.zeros((1, padded_vocab_size), dtype=torch.float32)
+        logprobs[0,:len(logprobsnp)] = torch.tensor(logprobsnp)
         if "diff" in f:
             output = trainer.generate(
                 inputs={
@@ -57,11 +61,11 @@ for idx in example_idxs:
                 generation_kwargs={
                     "do_sample": False,
                     "min_new_tokens": 1,
-                    "max_new_tokens": 1,
+                    "max_new_tokens": 64,
                 },
             )
             idxs_diff.append(idx)
-            predictions_diff.append(output)
+            predictions_diff.append(tokenizer.batch_decode(output)[0])
             references_diff.append(prefix)
         elif "mc" in f:
             output = trainer.generate(
@@ -73,11 +77,11 @@ for idx in example_idxs:
                 generation_kwargs={
                     "do_sample": False,
                     "min_new_tokens": 1,
-                    "max_new_tokens": 1,
+                    "max_new_tokens": 64,
                 },
             )
             idxs_mc.append(idx)
-            predictions_mc.append(output)
+            predictions_mc.append(tokenizer.batch_decode(output)[0])
             references_mc.append(prefix)
         else:
             output = trainer.generate(
@@ -89,13 +93,12 @@ for idx in example_idxs:
                 generation_kwargs={
                     "do_sample": False,
                     "min_new_tokens": 1,
-                    "max_new_tokens": 1,
+                    "max_new_tokens": 64,
                 },
             )
             idxs.append(idx)
-            predictions.append(output)
+            predictions.append(tokenizer.batch_decode(output)[0])
             references.append(prefix)
-
 
 bleu = evaluate.load("bleu")
 bleu_score = bleu.compute(predictions=predictions,reference=references)
