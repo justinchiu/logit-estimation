@@ -26,6 +26,8 @@ trainer.suffix_ensemble = False
 trainer.model.use_frozen_embeddings_as_input = True
 trainer.args.per_device_eval_batch_size = 1
 
+tokenizer = trainer.tokenizer
+
 # vocab_size = trainer.embedder_tokenizer.vocab_size
 padded_vocab_size = 32768
 
@@ -63,7 +65,7 @@ for idx in example_idxs:
                 },
             )
             idxs_diff.append(idx)
-            predictions_diff.append(output)
+            predictions_diff.append(tokenizer.batch_decode(output)[0])
             references_diff.append(prefix)
         elif "mc" in f:
             output = trainer.generate(
@@ -79,7 +81,7 @@ for idx in example_idxs:
                 },
             )
             idxs_mc.append(idx)
-            predictions_mc.append(output)
+            predictions_mc.append(tokenizer.batch_decode(output)[0])
             references_mc.append(prefix)
         else:
             output = trainer.generate(
@@ -95,9 +97,8 @@ for idx in example_idxs:
                 },
             )
             idxs.append(idx)
-            predictions.append(output)
+            predictions.append(tokenizer.batch_decode(output)[0])
             references.append(prefix)
-        import pdb; pdb.set_trace()
 
 bleu = evaluate.load("bleu")
 bleu_score = bleu.compute(predictions=predictions,reference=references)
