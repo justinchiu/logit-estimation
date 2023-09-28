@@ -18,14 +18,12 @@ idx2files = {
 
 dataset = load_dataset("wentingzhao/one-million-instructions")["train"]
 
-"""
 experiment, trainer = analyze_utils.load_experiment_and_trainer_from_pretrained(
     "jxm/t5-base__llama-7b__one-million-paired-instructions",
 )
 trainer.suffix_ensemble = False
 trainer.model.use_frozen_embeddings_as_input = True
 trainer.args.per_device_eval_batch_size = 1
-"""
 
 # vocab_size = trainer.embedder_tokenizer.vocab_size
 padded_vocab_size = 32768
