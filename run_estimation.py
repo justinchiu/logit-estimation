@@ -2,6 +2,7 @@ import numpy as np
 from datasets import load_dataset
 from logit_estimation.estimators import naive_estimate, HfSampler, diffsearch
 import random
+from scipy.special import logsumexp
 
 N = 32000
 
