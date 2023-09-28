@@ -1,0 +1,3 @@
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [03:51<03:51, 231.16s/it]Loading checkpoint shards: 100%|██████████| 2/2 [04:14<00:00, 109.08s/it]Loading checkpoint shards: 100%|██████████| 2/2 [04:14<00:00, 127.39s/it]
+/home/jtc257/.cache/pypoetry/virtualenvs/logit-estimation-2FxTlGjw-py3.11/lib/python3.11/site-packages/torch/distributions/distribution.py:173: UserWarning: sample_n will be deprecated. Use .sample((n,)) instead
+  warnings.warn('sample_n will be deprecated. Use .sample((n,)) instead', UserWarning)

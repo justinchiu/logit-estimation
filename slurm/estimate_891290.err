@@ -1,0 +1,1 @@
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]slurmstepd: error: *** JOB 891290 ON lil-compute-02 CANCELLED AT 2023-09-28T17:51:34 DUE TO PREEMPTION ***
