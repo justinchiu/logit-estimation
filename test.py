@@ -7,7 +7,7 @@ import numpy as np
 
 
 vector_path = Path("saved_logits")
-vector_path = Path("saved_logits_old")
+#vector_path = Path("saved_logits_old")
 files = [x for x in vector_path.glob("*.npy") if x.is_file()]
 example_idxs = set([int(str(f.stem).split("-")[0]) for f in files if "diff" in str(f)])
 
