@@ -1,3 +1,4 @@
 Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:04<00:04,  4.12s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.48s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:05<00:00,  2.72s/it]
 /home/jtc257/.cache/pypoetry/virtualenvs/logit-estimation-2FxTlGjw-py3.11/lib/python3.11/site-packages/torch/distributions/distribution.py:173: UserWarning: sample_n will be deprecated. Use .sample((n,)) instead
   warnings.warn('sample_n will be deprecated. Use .sample((n,)) instead', UserWarning)
+slurmstepd: error: *** JOB 885132 ON jingjie-cpu-14 CANCELLED AT 2023-09-28T17:47:39 ***
