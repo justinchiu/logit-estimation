@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "logit-estimation"
+name = "logit_estimation"
 version = "0.0.0"
 description = "Logit estimation from LLM APIs"
 authors = ["Justin Chiu <chiu.justin.t@gmail.com>"]
