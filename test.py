@@ -4,6 +4,7 @@ from vec2text import analyze_utils
 from datasets import load_dataset
 import evaluate
 import numpy as np
+from rich.progress import track
 
 
 vector_path = Path("saved_logits")
@@ -37,7 +38,7 @@ references_mc = []
 idxs = []
 predictions = []
 references = []
-for idx in example_idxs:
+for idx in track(example_idxs):
     example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
