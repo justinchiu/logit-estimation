@@ -38,7 +38,8 @@ references_mc = []
 idxs = []
 predictions = []
 references = []
-for idx in track(example_idxs):
+#for idx in track(example_idxs):
+for idx in example_idxs:
     example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
@@ -58,7 +59,7 @@ for idx in track(example_idxs):
                 generation_kwargs={
                     "do_sample": False,
                     "min_new_tokens": 1,
-                    "max_new_tokens": 1,
+                    "max_new_tokens": 64,
                 },
             )
             idxs_diff.append(idx)
@@ -74,7 +75,7 @@ for idx in track(example_idxs):
                 generation_kwargs={
                     "do_sample": False,
                     "min_new_tokens": 1,
-                    "max_new_tokens": 1,
+                    "max_new_tokens": 64,
                 },
             )
             idxs_mc.append(idx)
@@ -90,7 +91,7 @@ for idx in track(example_idxs):
                 generation_kwargs={
                     "do_sample": False,
                     "min_new_tokens": 1,
-                    "max_new_tokens": 1,
+                    "max_new_tokens": 64,
                 },
             )
             idxs.append(idx)
