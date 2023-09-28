@@ -227,8 +227,9 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
         num_calls += 1
         if low < -1e3:
             # likely a -inf for the next word
-            import pdb; pdb.set_trace()
-            return float("-inf", idx, num_calls)
+            # just default to something?
+            #return float("-inf"), idx, num_calls
+            return -50, idx, num_calls
 
     # improve estimate
     mid = (high + low) / 2
