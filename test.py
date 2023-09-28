@@ -96,7 +96,7 @@ for idx in track(example_idxs):
             idxs.append(idx)
             predictions.append(output)
             references.append(prefix)
-
+        import pdb; pdb.set_trace()
 
 bleu = evaluate.load("bleu")
 bleu_score = bleu.compute(predictions=predictions,reference=references)
