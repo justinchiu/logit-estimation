@@ -99,6 +99,7 @@ for idx in track(example_idxs):
             idxs.append(idx)
             predictions.append(tokenizer.batch_decode(output)[0])
             references.append(prefix)
+        break
 
 bleu = evaluate.load("bleu")
 bleu_score = bleu.compute(predictions=predictions,reference=references)
