@@ -6,6 +6,8 @@ import torch
 import numpy as np
 from scipy.special import logsumexp
 
+from rich.progress import track
+
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.distributions import Categorical, kl_divergence
 
@@ -32,8 +34,8 @@ def construct_logit_bias_tensor(logit_bias_dict, vocab_size):
 
 class HfSampler(Sampler):
     def __init__(self, model):
-        #self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
-        self.model = AutoModelForCausalLM.from_pretrained(model)
+        self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
+        #self.model = AutoModelForCausalLM.from_pretrained(model)
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.vocab_size = len(self.tokenizer)
         self.cached_logits = None
@@ -50,7 +52,8 @@ class HfSampler(Sampler):
             else self.cached_logits
         )
         if logit_bias is not None:
-            logits = logits + construct_logit_bias_tensor(logit_bias, len(logits))
+            #logits = logits + construct_logit_bias_tensor(logit_bias, len(logits))
+            logits = logits + torch.tensor(logit_bias)
 
         true_dist = Categorical(logits=logits)
 
@@ -201,7 +204,7 @@ class Estimator:
 
 def query_ordering(sampler, prefix, bias=-1000):
     vocab_size = sampler.vocab_size
-    logit_bias = dict()
+    logit_bias = np.zeros((vocab_size,))
     ordering = []
     for i in range(vocab_size):
         idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
@@ -210,7 +213,7 @@ def query_ordering(sampler, prefix, bias=-1000):
     return ordering
 
 def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
-    logit_bias = logit_bias.copy()
+    logit_bias = logit_bias + 0 # force copy
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
     idx_lower = None
@@ -243,13 +246,17 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
 
 
 def estimate(sampler, prefix, K, T, threshold):
+    vocab_size = sampler.vocab_size
     estimator = Estimator(sampler.vocab_size, threshold)
     for t in range(T):
         weight, words = estimator.weight()
         if weight is None:
             break
         #logit_bias = {word: -100 for word in words}
-        logit_bias = {word: -1000 for word in words}
+        logit_bias = np.zeros((vocab_size,), dtype=np.float64)
+        import pdb; pdb.set_trace()
+        logit_bias[words] = -1000
+
         sample_output = sampler.sample(prefix, K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
@@ -257,12 +264,16 @@ def estimate(sampler, prefix, K, T, threshold):
 
 def naive_estimate(sampler, prefix, K):
     estimator = Estimator(sampler.vocab_size)
-    sample_output = sampler.sample(prefix, K, dict())
+    sample_output = sampler.sample(prefix, K)
     estimator.add_sample(sample_output)
     return estimator, K
 
-def search(sampler, prefix, topk, logit_bias, bias=-100):
-    logit_bias = logit_bias.copy()
+def search(sampler, prefix, topk, logit_bias=None, bias=-100):
+    logit_bias = (
+        logit_bias + 0 # force copy
+        if logit_bias is not None
+        else np.zeros(vocab_size, dtype=np.float64)
+    )
     highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
 
     diffs = [0]
@@ -279,15 +290,20 @@ def search(sampler, prefix, topk, logit_bias, bias=-100):
     estimated_logits = np.array(diffs, dtype=np.float64).cumsum()
     return idxs, estimated_logits, logit_bias, total_calls
 
-def diffsearch(sampler, prefix, topk, logit_bias, bias=-1000):
-    logit_bias = logit_bias.copy()
+def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000):
+    vocab_size = sampler.vocab_size
+    logit_bias = (
+        logit_bias + 0 # force copy
+        if logit_bias is not None
+        else np.zeros(vocab_size, dtype=np.float64)
+    )
     highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
 
     diffs = [0]
     idxs = [highest_idx]
     total_calls = 1
     logit_diff = 0
-    for _ in range(topk):
+    for _ in track(range(topk)):
         logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff)
         logit_bias[idx_lower] = bias
         diffs.append(logit_diff)
@@ -299,9 +315,10 @@ def diffsearch(sampler, prefix, topk, logit_bias, bias=-1000):
     return idxs, estimated_logits, logit_bias, total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
+    vocab_size = sampler.vocab_size
     #idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 16, dict())
     #idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 64, dict())
-    idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128, dict())
+    idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128)
 
     bias = -1000
     estimator = Estimator(sampler.vocab_size, threshold,
@@ -314,13 +331,15 @@ def search_then_estimate(sampler, prefix, K, T, threshold):
         weight, words = estimator.weight()
         if weight is None:
             break
-        logit_bias = {word: bias for word in words}
+        logit_bias = np.zeros((vocab_size,), dtype=np.float64)
+        logit_bias[words] = -1000
         sample_output = sampler.sample(prefix, K, logit_bias)
-        allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
+        allowed_words = logit_bias == 0
         estimator.add_sample(sample_output, weight, allowed_words=allowed_words)
 
     weight, words = estimator.weight()
-    logit_bias = {word: bias for word in words}
+    logit_bias = np.zeros((vocab_size,), dtype=np.float64)
+    logit_bias[words] = -1000
     if weight is not None:
         sample_output = sampler.sample(prefix, remaining_calls % K, logit_bias)
         allowed_words = [x for x in range(sampler.vocab_size) if x not in logit_bias]
@@ -329,7 +348,7 @@ def search_then_estimate(sampler, prefix, K, T, threshold):
     return estimator, K*T
 
 def search_then_sample(sampler, prefix, K, T, threshold):
-    idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128, dict())
+    idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128)
 
     bias = -1000
     estimator = Estimator(sampler.vocab_size, threshold,

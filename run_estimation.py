@@ -16,7 +16,7 @@ sampler = HfSampler(model)
 sampler.sample(prefix, 1)
 np.save(f"saved_logits/{index}-true.npy", sampler.cached_logits.numpy())
 
-idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, N, dict())
+idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, N)
 lp = np.full((sampler.vocab_size,), float("-inf"), dtype=np.float64)
 Zhat = logsumexp(estimated_logits)
 lp[idxs] = estimated_logits - Zhat
