@@ -47,7 +47,7 @@ for idx in track(example_idxs):
         f = str(f)
         logprobsnp = np.load(f)
         logprobs = torch.zeros((1, padded_vocab_size), dtype=torch.float32)
-        logprobs[:len(logprobsnp)] = logprobsnp
+        logprobs[:len(logprobsnp)] = torch.tensor(logprobsnp)
         if "diff" in f:
             output = trainer.generate(
                 inputs={
