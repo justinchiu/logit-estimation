@@ -212,7 +212,7 @@ def query_ordering(sampler, prefix, bias=-1000):
         ordering.append(idx)
     return ordering
 
-def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-10):
+def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
     logit_bias = logit_bias + 0 # force copy
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
@@ -591,5 +591,5 @@ if __name__ == "__main__":
     plt.ylabel("Probability")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"figures/{model_name}_truncated_samples_1000.png")
+   plt.savefig(f"figures/{model_name}_truncated_samples_1000.png")
     plt.clf()
