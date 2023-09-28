@@ -229,7 +229,7 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
             # likely a -inf for the next word
             # just default to something?
             #return float("-inf"), idx, num_calls
-            return -50, idx, num_calls
+            return None, idx, num_calls, idx_lower
 
     # improve estimate
     mid = (high + low) / 2
@@ -282,10 +282,12 @@ def search(sampler, prefix, topk, logit_bias=None, bias=-100):
     total_calls = 0
     for _ in range(topk):
         logit_diff, idx, num_calls, lower_idx = binary_search(sampler, prefix, logit_bias)
+        total_calls += num_calls
+        if logit_diff is None:
+            break
         logit_bias[idx] = bias
         diffs.append(logit_diff)
         idxs.append(lower_idx)
-        total_calls += num_calls
         print(total_calls, _, topk)
 
     estimated_logits = np.array(diffs, dtype=np.float64).cumsum()
@@ -306,10 +308,12 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000):
     logit_diff = 0
     for _ in track(range(topk)):
         logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff)
+        total_calls += num_calls
+        if logit_diff is None:
+            break
         logit_bias[idx_lower] = bias
         diffs.append(logit_diff)
         idxs.append(idx_lower)
-        total_calls += num_calls
         print(total_calls, _, topk)
 
     estimated_logits = np.array(diffs, dtype=np.float64)
