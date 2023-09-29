@@ -116,16 +116,16 @@ tokenizer = trainer.tokenizer
 # vocab_size = trainer.embedder_tokenizer.vocab_size
 padded_vocab_size = 32768
 
-idxs_diff = []
-predictions_diff = []
-references_diff = []
-idxs_mc = []
-predictions_mc = []
-references_mc = []
-idxs = []
-predictions = []
-references = []
 for precision in precisions:
+    idxs_diff = []
+    predictions_diff = []
+    references_diff = []
+    idxs_mc = []
+    predictions_mc = []
+    references_mc = []
+    idxs = []
+    predictions = []
+    references = []
     example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
