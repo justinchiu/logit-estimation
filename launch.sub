@@ -14,4 +14,4 @@
 
 cd /home/jtc257/python/logit-estimation
 poetry shell
-python run_estimation.py
+python run_estimation.py $@
