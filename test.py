@@ -168,7 +168,7 @@ for precision in precisions:
                 idxs_mc.append(example_idx)
                 predictions_mc.append(tokenizer.batch_decode(output)[0])
                 references_mc.append([prefix])
-            else:
+            elif "true" in f:
                 output = trainer.generate(
                     inputs={
                         "embedder_input_ids": None,
@@ -184,6 +184,8 @@ for precision in precisions:
                 idxs.append(example_idx)
                 predictions.append(tokenizer.batch_decode(output)[0])
                 references.append([prefix])
+            else:
+                raise ValueError
 
     print("PRECISION @", precision)
     bleu = evaluate.load("bleu")
