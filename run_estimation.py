@@ -8,8 +8,8 @@ from pathlib import Path
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("index")
-parser.add_argument("N")
+parser.add_argument("index", type=int)
+parser.add_argument("N", type=int)
 args = parser.parse_args()
 
 index = args.index
