@@ -129,7 +129,7 @@ for precision in precisions:
     example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
-    for example_idx in example_idxs:
+    for example_idx in track(example_idxs):
         for file in files[f"{example_idx}{precision}"]:
             f = str(vector_path / file)
             logprobsnp = np.load(f)
