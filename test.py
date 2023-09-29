@@ -86,6 +86,86 @@ files = {
         "4-mc-779349.npy",
         "4-diff-779349-eps0.0001.npy",
     ],
+    "03": [
+        "0-true.npy", 
+        "0-mc-694407.npy",
+        "0-diff-694407-eps0.001.npy",
+    ],
+    "13": [
+        "1-true.npy", 
+        "1-mc-692164.npy",
+        "1-diff-692164-eps0.001.npy",
+    ],
+    "23": [
+        "2-true.npy", 
+        "2-mc-696107.npy",
+        "2-diff-696107-eps0.001.npy",
+    ],
+    "33": [
+        "3-true.npy", 
+        "3-mc-.npy",
+        "3-diff--eps0.001.npy",
+    ],
+    "43": [
+        "4-true.npy", 
+        "4-mc-698277.npy",
+        "4-diff-698277-eps0.001.npy",
+    ],
+    "02": [
+        "0-true.npy", 
+        "0-mc-367187.npy",
+        "0-diff-367187-eps0.01.npy",
+    ],
+    "12": [
+        "1-true.npy", 
+        "1-mc-352955.npy",
+        "1-diff-352955-eps0.01.npy",
+    ],
+    "22": [
+        "2-true.npy", 
+        "2-mc-367356.npy",
+        "2-diff-367356-eps0.01.npy",
+    ],
+    "32": [
+        "3-true.npy", 
+        "3-mc-360216.npy",
+        "3-diff-360216-eps0.01.npy",
+    ],
+    "42": [
+        "4-true.npy", 
+        "4-mc-350889.npy",
+        "4-diff-350889-eps0.01.npy",
+    ],
+    "01": [
+        "0-true.npy", 
+        "0-mc-300980.npy",
+        "0-diff-300980-eps0.1.npy",
+    ],
+    "11": [
+        "1-true.npy", 
+        "1-mc-291352.npy",
+        "1-diff-291352-eps0.1.npy",
+    ],
+    "21": [
+        "2-true.npy", 
+        "2-mc-265957.npy",
+        "2-diff-265957-eps0.1.npy",
+    ],
+    "31": [
+        "3-true.npy", 
+        "3-mc-299686.npy",
+        "3-diff-299686-eps0.1.npy",
+    ],
+    "41": [
+        "4-true.npy", 
+        "4-mc-296890.npy",
+        "4-diff-296890-eps0.1.npy",
+    ],
+
+
+
+
+
 }
 
 # validate files
@@ -99,7 +179,7 @@ example_idxs = set([
     if "diff" in str(f) and precision in str(f)
 ])
 example_idxs = [0,1,2,3,4]
-precisions = [8,6,4]
+precisions = [8,6,4,3,2,1]
 
 
 dataset = load_dataset("wentingzhao/one-million-instructions")["train"]
