@@ -28,7 +28,6 @@ prefix = d["system"] + "\n\n" + d["user"]
 
 #model = "meta-llama/Llama-2-7b-chat-hf"
 model = "meta-llama/Llama-2-7b-hf"
-model = "gpt2"
 sampler = HfSampler(model)
 sampler.sample(prefix, 1)
 np.save(f"saved_logits-{N}/{index}-true.npy", sampler.cached_logits.numpy())
