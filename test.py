@@ -148,7 +148,7 @@ for precision in precisions:
                         "max_new_tokens": 64,
                     },
                 )
-                idxs_diff.append(idx)
+                idxs_diff.append(example_idx)
                 predictions_diff.append(tokenizer.batch_decode(output)[0])
                 references_diff.append([prefix])
             elif "mc" in f:
@@ -164,7 +164,7 @@ for precision in precisions:
                         "max_new_tokens": 64,
                     },
                 )
-                idxs_mc.append(idx)
+                idxs_mc.append(example_idx)
                 predictions_mc.append(tokenizer.batch_decode(output)[0])
                 references_mc.append([prefix])
             else:
@@ -180,7 +180,7 @@ for precision in precisions:
                         "max_new_tokens": 64,
                     },
                 )
-                idxs.append(idx)
+                idxs.append(example_idx)
                 predictions.append(tokenizer.batch_decode(output)[0])
                 references.append([prefix])
 
