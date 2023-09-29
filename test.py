@@ -103,11 +103,11 @@ for idx in track(example_idxs):
     # for debugging
 
 bleu = evaluate.load("bleu")
-bleu_score = bleu.compute(predictions=predictions,reference=references)
+bleu_score = bleu.compute(predictions=predictions,references=references)
 print("GT", bleu_score)
-bleu_score = bleu.compute(predictions=predictions_diff,reference=references_diff)
+bleu_score = bleu.compute(predictions=predictions_diff,references=references_diff)
 print("Diff", bleu_score)
-bleu_score = bleu.compute(predictions=predictions_mc,reference=references_mc)
+bleu_score = bleu.compute(predictions=predictions_mc,references=references_mc)
 print("MC", bleu_score)
 
 output_file = Path("outputs/preds_refs_gt.txt")
