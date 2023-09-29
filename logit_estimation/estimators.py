@@ -213,6 +213,7 @@ def query_ordering(sampler, prefix, bias=-1000):
     return ordering
 
 def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
+    print(eps)
     logit_bias = logit_bias + 0 # force copy
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
