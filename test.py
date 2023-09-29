@@ -111,12 +111,12 @@ print("MC", bleu_score)
 output_file = Path("outputs/preds_refs_gt.txt")
 with output_file.open("w") as f:
     for idx, pred, ref in zip(idxs, predictions, references):
-        f.write(f"{idx}: {ref}\t{pref}\n")
+        f.write(f"{idx}: {ref}\t{pred}\n")
 output_file = Path("outputs/preds_refs_diff.txt")
 with output_file.open("w") as f:
     for idx, pred, ref in zip(idxs_diff, predictions_diff, references_diff):
-        f.write(f"{idx}: {ref}\t{pref}\n")
+        f.write(f"{idx}: {ref}\t{pred}\n")
 output_file = Path("outputs/preds_refs_mc.txt")
 with output_file.open("w") as f:
     for idx, pred, ref in zip(idxs_mc, predictions_mc, references_mc):
-        f.write(f"{idx}: {ref}\t{pref}\n")
+        f.write(f"{idx}: {ref}\t{pred}\n")
