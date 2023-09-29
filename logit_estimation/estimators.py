@@ -309,7 +309,7 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
     for _ in track(range(topk)):
         logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff, eps=eps)
         total_calls += num_calls
-        if logit_diff is None:
+        if logit_diff is None or idx is None:
             break
         logit_bias[idx_lower] = bias
         diffs.append(logit_diff)
