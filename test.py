@@ -7,10 +7,17 @@ import numpy as np
 from rich.progress import track
 
 
-vector_path = Path("saved_logits")
+precision = "1e-8"
+
+vector_path = Path("saved_logits-32000")
+#vector_path = Path("saved_logits")
 #vector_path = Path("saved_logits_old")
 files = [x for x in vector_path.glob("*.npy") if x.is_file()]
-example_idxs = set([int(str(f.stem).split("-")[0]) for f in files if "diff" in str(f)])
+example_idxs = set([
+    int(str(f.stem).split("-")[0])
+    for f in files
+    if "diff" in str(f) and precision in str(f)
+])
 
 idx2files = {
     idx: [f for f in files if str(idx) in str(f)]
@@ -100,6 +107,7 @@ for idx in track(example_idxs):
             predictions.append(tokenizer.batch_decode(output)[0])
             references.append([prefix])
 
+print("PRECISION @", precision)
 bleu = evaluate.load("bleu")
 bleu_score = bleu.compute(predictions=predictions,references=references)
 print("GT", bleu_score)
@@ -112,7 +120,7 @@ output_file = Path("outputs/preds_refs_gt.txt")
 with output_file.open("w") as f:
     for idx, pred, ref in zip(idxs, predictions, references):
         f.write(f"{idx}: {ref}\t{pred}\n")
-output_file = Path("outputs/preds_refs_diff.txt")
+output_file = Path(f"outputs/preds_refs_diff_{precision}.txt")
 with output_file.open("w") as f:
     for idx, pred, ref in zip(idxs_diff, predictions_diff, references_diff):
         f.write(f"{idx}: {ref}\t{pred}\n")
