@@ -10,10 +10,12 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("index", type=int)
 parser.add_argument("N", type=int)
+parser.add_argument("eps", type=float, default=1e-8)
 args = parser.parse_args()
 
 index = args.index
 N = args.N
+eps = args.eps
 #N = 32000
 
 Path(f"saved_logits-{N}").mkdir(exist_ok=True)
@@ -30,11 +32,11 @@ sampler = HfSampler(model)
 sampler.sample(prefix, 1)
 np.save(f"saved_logits-{N}/{index}-true.npy", sampler.cached_logits.numpy())
 
-idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, N)
+idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, N, eps)
 lp = np.full((sampler.vocab_size,), float("-inf"), dtype=np.float64)
 Zhat = logsumexp(estimated_logits)
 lp[idxs] = estimated_logits - Zhat
-np.save(f"saved_logits-{N}/{index}-diff-{total_calls}.npy", lp)
+np.save(f"saved_logits-{N}/{index}-diff-{total_calls}-eps{eps}.npy", lp)
 
 estimator, num_calls = naive_estimate(sampler, prefix, total_calls)
 log_probs = estimator.mean()

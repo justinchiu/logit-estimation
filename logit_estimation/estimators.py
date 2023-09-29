@@ -293,7 +293,7 @@ def search(sampler, prefix, topk, logit_bias=None, bias=-100):
     estimated_logits = np.array(diffs, dtype=np.float64).cumsum()
     return idxs, estimated_logits, logit_bias, total_calls
 
-def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000):
+def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
     vocab_size = sampler.vocab_size
     logit_bias = (
         logit_bias + 0 # force copy
@@ -307,7 +307,7 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000):
     total_calls = 1
     logit_diff = 0
     for _ in track(range(topk)):
-        logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff)
+        logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff, eps=eps)
         total_calls += num_calls
         if logit_diff is None:
             break
