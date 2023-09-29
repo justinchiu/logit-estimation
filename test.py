@@ -133,6 +133,7 @@ for precision in precisions:
         for file in files[f"{example_idx}{precision}"]:
             f = str(vector_path / file)
             logprobsnp = np.load(f)
+            logprobsnp[logprobsnp < -100] = -30
             logprobs = torch.zeros((1, padded_vocab_size), dtype=torch.float32)
             logprobs[0,:len(logprobsnp)] = torch.tensor(logprobsnp)
             if "diff" in f:
