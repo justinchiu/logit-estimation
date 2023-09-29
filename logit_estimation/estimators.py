@@ -34,8 +34,8 @@ def construct_logit_bias_tensor(logit_bias_dict, vocab_size):
 
 class HfSampler(Sampler):
     def __init__(self, model):
-        #self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
-        self.model = AutoModelForCausalLM.from_pretrained(model)
+        self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
+        #self.model = AutoModelForCausalLM.from_pretrained(model)
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.vocab_size = len(self.tokenizer)
         self.cached_logits = None
