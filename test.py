@@ -126,10 +126,10 @@ for precision in precisions:
     idxs = []
     predictions = []
     references = []
-    example = dataset[idx]
     prefix = example["system"] + "\n\n" + example["user"]
 
     for example_idx in track(example_idxs):
+        example = dataset[example_idx]
         for file in files[f"{example_idx}{precision}"]:
             f = str(vector_path / file)
             logprobsnp = np.load(f)
