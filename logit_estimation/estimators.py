@@ -34,8 +34,8 @@ def construct_logit_bias_tensor(logit_bias_dict, vocab_size):
 
 class HfSampler(Sampler):
     def __init__(self, model):
-        self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
-        #self.model = AutoModelForCausalLM.from_pretrained(model)
+        #self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
+        self.model = AutoModelForCausalLM.from_pretrained(model)
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.vocab_size = len(self.tokenizer)
         self.cached_logits = None
@@ -216,19 +216,22 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
     logit_bias = logit_bias + 0 # force copy
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
-    idx_lower = None
 
     #print(sampler.cached_logits.topk(2).values[0] - sampler.cached_logits.topk(2).values[1])
-    num_calls = 1
+    idx_lower = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+    num_calls = 2
     # double low if it's not low enough
-    while sampler.sample(prefix, 1, logit_bias, temperature=0).argmax == idx:
+    while idx_lower == idx:
         low *= 2
         logit_bias[idx] = low
+        idx_lower = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
         num_calls += 1
         if low < -1e3:
             # likely a -inf for the next word
             # just default to something?
             #return float("-inf"), idx, num_calls
+            if idx_lower is None:
+                import pdb; pdb.set_trace()
             return None, idx, num_calls, idx_lower
 
     # improve estimate
@@ -306,7 +309,8 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
     idxs = [highest_idx]
     total_calls = 1
     logit_diff = 0
-    for _ in track(range(topk)):
+    #for _ in track(range(topk)):
+    for _ in range(topk):
         logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff, eps=eps)
         total_calls += num_calls
         if logit_diff is None or idx is None:
@@ -314,6 +318,8 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
         logit_bias[idx_lower] = bias
         diffs.append(logit_diff)
         idxs.append(idx_lower)
+        if idx_lower is None:
+            import pdb; pdb.set_trace()
         print(total_calls, _, topk)
 
     estimated_logits = np.array(diffs, dtype=np.float64)
