@@ -7,9 +7,9 @@ from scipy.special import logsumexp
 from pathlib import Path
 
 import argparse
-parser = ArgumentParser()
-parser.add_arguments("index")
-parser.add_arguments("N")
+parser = argparse.ArgumentParser()
+parser.add_argument("index")
+parser.add_argument("N")
 args = parser.parse_args()
 
 index = args.index
