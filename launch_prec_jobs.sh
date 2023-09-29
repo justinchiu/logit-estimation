@@ -1,9 +1,11 @@
 #!/bin/bash
 
-for i in {0..5}
+for i in {6..10}
 do
     sbatch launch.sub $i 32000 1e-8
     sbatch launch.sub $i 32000 1e-6
     sbatch launch.sub $i 32000 1e-4
-    sbatch launch.sub $i 32000 1e-2
+    sbatch launch.sub $i 32000 1e-7
+    sbatch launch.sub $i 32000 1e-5
+    sbatch launch.sub $i 32000 1e-3
 done
