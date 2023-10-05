@@ -59,7 +59,7 @@ class HfSampler(Sampler):
 
         return Output(
             samples = true_dist.sample_n(K).tolist() if temperature > 0 else None,
-            argmax = logits.argmax().item(),
+            argmax = logits.argmax(-1),
             true_dist = true_dist,
         )
 
@@ -76,14 +76,12 @@ class HfSampler(Sampler):
             top_k=0,
             num_beams=1,
         )
-        #import pdb; pdb.set_trace()
         logits = outputs.scores[0][0].log_softmax(0)
         self.cached_logits = logits
         return logits
 
 class GptSampler(Sampler):
     def __init__(self, model):
-        #self.model = AutoModelForCausalLM.from_pretrained(model, torch_dtype=torch.bfloat16)
         self.model = model
         self.vocab_size = 100000
 
@@ -170,15 +168,9 @@ class Estimator:
         w = np.array(self.log_weights, dtype=np.float64)
 
         lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
-        #lp = np.full((self.vocab_size,), -sys.float_info.max, dtype=np.float64)
-        #lp = np.full((self.vocab_size,), -1e12, dtype=np.float64)
-        #lp = np.full((self.vocab_size,), -1e2, dtype=np.float64)
         np.logaddexp.at(lp, s, w)
         # is this numerically stable?
          
-        # try a really slow version
-        #import pdb; pdb.set_trace()
-
         log_probs = lp - np.log(self.Zs)
 
         if self.estimated_logits is not None:
@@ -213,12 +205,10 @@ def query_ordering(sampler, prefix, bias=-1000):
     return ordering
 
 def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
-    print(eps)
     logit_bias = logit_bias + 0 # force copy
     idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     logit_bias[idx] = low
 
-    #print(sampler.cached_logits.topk(2).values[0] - sampler.cached_logits.topk(2).values[1])
     idx_lower = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
     num_calls = 2
     # double low if it's not low enough
@@ -229,8 +219,6 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
         num_calls += 1
         if low < -1e3:
             # likely a -inf for the next word
-            # just default to something?
-            #return float("-inf"), idx, num_calls
             if idx_lower is None:
                 import pdb; pdb.set_trace()
             return None, idx, num_calls, idx_lower
@@ -250,6 +238,53 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
     return mid, idx, num_calls, idx_lower
 
 
+def bisection_search(sampler, prefix, logit_bias, low=0, high=0.2, eps=1e-8):
+    # todo: implement the paper version w/ openai compatibility
+    pass
+
+def batch_bisection_search(sampler, prefix, logit_bias, low=0, high=0.2, eps=1e-8):
+    # for efficiency: specialized to case where we have true logits
+    # get highest idx / argmax
+    idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+    logits = sampler.cached_logits.to(torch.float32).numpy()
+    V = logit_bias.shape[0]
+    max_logit = logits[idx]
+
+    # force copy
+    highs = logit_bias * 0 + high
+    lows = logit_bias * 0 + low
+    complete = np.zeros(V, dtype=bool)
+
+    # for each word, search upward until each argmax(logits + logit_biases) != idx
+    exceeds = (logits + highs) > max_logit
+    num_calls = 1 + V
+    # double low if it's not low enough
+    while (exceeds + complete).sum() < V:
+        highs[~exceeds] *= 2
+        exceeds = (logits + highs) > max_logit
+        # simulate that we only call argmax for elements not in `exceeds`
+        num_calls += (~exceeds).sum()
+        highest = highs.max()
+        if highest > 1e3:
+            highs[~exceeds] = float("inf")
+            complete[~exceeds] = False
+
+    # improve estimate
+    lows = highs / 2
+    lows[idx] = 0
+    highs[idx] = 0
+    while (~complete).any():
+        mids = (highs + lows) / 2
+        exceeds = (logits + mids) > max_logit
+        highs[exceeds & ~complete] = mids[exceeds & ~complete]
+        lows[~exceeds & ~complete] = mids[~exceeds & ~complete]
+        is_finished = highs <= lows + eps
+        complete |= is_finished
+        num_calls += (~complete).sum()
+    return mids, idx, num_calls
+
+
+
 def estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
     estimator = Estimator(sampler.vocab_size, threshold)
@@ -259,7 +294,6 @@ def estimate(sampler, prefix, K, T, threshold):
             break
         #logit_bias = {word: -100 for word in words}
         logit_bias = np.zeros((vocab_size,), dtype=np.float64)
-        import pdb; pdb.set_trace()
         logit_bias[words] = -1000
 
         sample_output = sampler.sample(prefix, K, logit_bias)
@@ -292,7 +326,6 @@ def search(sampler, prefix, topk, logit_bias=None, bias=-100):
         logit_bias[idx] = bias
         diffs.append(logit_diff)
         idxs.append(lower_idx)
-        print(total_calls, _, topk)
 
     estimated_logits = np.array(diffs, dtype=np.float64).cumsum()
     return idxs, estimated_logits, logit_bias, total_calls
@@ -319,17 +352,12 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
         logit_bias[idx_lower] = bias
         diffs.append(logit_diff)
         idxs.append(idx_lower)
-        if idx_lower is None:
-            import pdb; pdb.set_trace()
-        print(total_calls, _, topk)
 
     estimated_logits = np.array(diffs, dtype=np.float64)
     return idxs, estimated_logits, logit_bias, total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
-    #idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 16, dict())
-    #idxs, estimated_logits, logit_bias, total_calls = search(sampler, prefix, 64, dict())
     idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128)
 
     bias = -1000
@@ -377,12 +405,13 @@ if __name__ == "__main__":
     import seaborn as sns
     import matplotlib.pyplot as plt
 
+
     llama = "meta-llama/Llama-2-7b-chat-hf"
     #llama = "meta-llama/Llama-2-7b-hf"
     gpt = "gpt2"
 
     USE_LLAMA = False
-    USE_LLAMA = True
+    #USE_LLAMA = True
 
     if not USE_LLAMA:
         model = gpt
@@ -399,12 +428,12 @@ if __name__ == "__main__":
         prefix = "hi"
 
 
-
     # test sampling
     sampler = HfSampler(model)
     output = sampler.sample(prefix, 128)
     true_dist = output.true_dist
 
+    batch_bisection_search(sampler, prefix, np.zeros(true_dist.probs.shape))
 
     """
     encoded_prompt = sampler.tokenizer(prefix, return_tensors="pt")
