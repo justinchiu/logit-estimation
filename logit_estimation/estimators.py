@@ -356,6 +356,12 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
     estimated_logits = np.array(diffs, dtype=np.float64)
     return idxs, estimated_logits, logit_bias, total_calls
 
+def batch_diffsearch(sampler, prefix, eps=1e-8):
+    vocab_size = sampler.vocab_size
+    logit_bias = np.zeros(vocab_size, dtype=np.float64)
+    estimated_logits, idx, num_calls = batch_bisection_search(sampler, prefix, logit_bias, eps=eps)
+    return estimated_logits - logsumexp(estimated_logits), total_calls
+
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
     idxs, estimated_logits, logit_bias, total_calls = diffsearch(sampler, prefix, 128)
