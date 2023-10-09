@@ -38,3 +38,8 @@ np.save(f"saved_logits-batch/{index}-mc-{total_calls}.npy", log_probs)
 
 lp, total_calls = diffsearch(sampler, prefix, eps=eps)
 np.save(f"saved_logits-batch/{index}-diff-{total_calls}-eps{eps}.npy", lp)
+
+estimator, num_calls = naive_estimate(sampler, prefix, total_calls)
+log_probs = estimator.mean()
+np.save(f"saved_logits-batch/{index}-mc-{total_calls}.npy", log_probs)
+
