@@ -15,7 +15,7 @@ args = parser.parse_args()
 index = args.index
 eps = args.eps
 
-Path(f"saved_logits_batch").mkdir(exist_ok=True)
+Path(f"saved_logits-batch").mkdir(exist_ok=True)
 
 dataset = load_dataset("wentingzhao/one-million-instructions")["train"]
 #index = random.randint(0, len(dataset))
