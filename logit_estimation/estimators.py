@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from scipy.special import logsumexp
 
-from rich.progress import track
+#from rich.progress import track
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.distributions import Categorical, kl_divergence
