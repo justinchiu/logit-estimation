@@ -330,7 +330,7 @@ def search(sampler, prefix, topk, logit_bias=None, bias=-100):
     estimated_logits = np.array(diffs, dtype=np.float64).cumsum()
     return idxs, estimated_logits, logit_bias, total_calls
 
-def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
+def diffsearch(sampler, prefix, logit_bias=None, bias=-1000, eps=1e-8):
     vocab_size = sampler.vocab_size
     logit_bias = (
         logit_bias + 0 # force copy
@@ -344,7 +344,7 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
     total_calls = 1
     logit_diff = 0
     #for _ in track(range(topk)):
-    for _ in range(topk):
+    for _ in range(vocab_size):
         logit_diff, idx, num_calls, idx_lower = binary_search(sampler, prefix, logit_bias, high=logit_diff, eps=eps)
         total_calls += num_calls
         if logit_diff is None or idx is None:
@@ -354,7 +354,8 @@ def diffsearch(sampler, prefix, topk, logit_bias=None, bias=-1000, eps=1e-8):
         idxs.append(idx_lower)
 
     estimated_logits = np.array(diffs, dtype=np.float64)
-    return idxs, estimated_logits, logit_bias, total_calls
+    return estimated_logits[idxs] - logsumexp(estimated_logits), total_calls
+    #return idxs, estimated_logits, logit_bias, total_calls
 
 def batch_diffsearch(sampler, prefix, eps=1e-8):
     vocab_size = sampler.vocab_size
