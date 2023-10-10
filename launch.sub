@@ -13,5 +13,6 @@
 #SBATCH --partition=default_partition       # Request partition
 
 cd /home/jtc257/python/logit-estimation
+conda deactivate
 poetry shell
 python run_estimation.py $@
