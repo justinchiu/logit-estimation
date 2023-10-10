@@ -353,8 +353,11 @@ def diffsearch(sampler, prefix, logit_bias=None, bias=-1000, eps=1e-8):
         diffs.append(logit_diff)
         idxs.append(idx_lower)
 
-    estimated_logits = np.array(diffs, dtype=np.float64)
-    return estimated_logits[idxs] - logsumexp(estimated_logits), total_calls
+    diffs = np.array(diffs, dtype=np.float64)
+    estimated_logits = np.zeros_like(diffs)
+    estimated_logits[idxs] = diffs
+
+    return estimated_logits - logsumexp(estimated_logits), total_calls
     #return idxs, estimated_logits, logit_bias, total_calls
 
 def batch_diffsearch(sampler, prefix, eps=1e-8):
