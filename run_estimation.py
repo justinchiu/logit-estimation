@@ -1,6 +1,6 @@
 import numpy as np
 from datasets import load_dataset
-from logit_estimation.estimators import naive_estimate, HfSampler, batch_diffsearch
+from logit_estimation.estimators import naive_estimate, HfSampler, batch_diffsearch, diffsearch
 import random
 from scipy.special import logsumexp
 
@@ -36,7 +36,7 @@ estimator, num_calls = naive_estimate(sampler, prefix, total_calls)
 log_probs = estimator.mean()
 np.save(f"saved_logits-batch/{index}-mc-{total_calls}.npy", log_probs)
 
-lp, total_calls = diffsearch(sampler, prefix, eps=eps)
+lp, total_calls = diffsearch(sampler, prefix, 32000, eps=eps)
 np.save(f"saved_logits-batch/{index}-diff-{total_calls}-eps{eps}.npy", lp)
 
 estimator, num_calls = naive_estimate(sampler, prefix, total_calls)

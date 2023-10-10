@@ -311,7 +311,7 @@ def search(sampler, prefix, topk, logit_bias=None, bias=-100):
     logit_bias = (
         logit_bias + 0 # force copy
         if logit_bias is not None
-        else np.zeros(vocab_size, dtype=np.float64)
+        else np.zeros(sampler.vocab_size, dtype=np.float64)
     )
     highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
 
@@ -360,7 +360,7 @@ def batch_diffsearch(sampler, prefix, eps=1e-8):
     vocab_size = sampler.vocab_size
     logit_bias = np.zeros(vocab_size, dtype=np.float64)
     estimated_logits, idx, num_calls = batch_bisection_search(sampler, prefix, logit_bias, eps=eps)
-    return estimated_logits - logsumexp(estimated_logits), total_calls
+    return estimated_logits - logsumexp(estimated_logits), num_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
