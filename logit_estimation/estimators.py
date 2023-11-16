@@ -84,8 +84,9 @@ class HfSampler(Sampler):
 
 class GptSampler(Sampler):
     def __init__(self, model):
+        enc = tiktoken.encoding_for_model(model)
         self.model = model
-        self.vocab_size = 100000
+        self.vocab_size = enc.n_vocab
 
     def sample(self, prefix, K, logit_bias=None, temperature=1, system=None):
         model = self.model
@@ -98,7 +99,7 @@ class GptSampler(Sampler):
                     model=model,
                     prompt=prefix,
                     temperature=temperature,
-                    max_tokens=1,
+                    max_tokens=2,
                     logit_bias=logit_bias,
                     n=K,
                 )
@@ -114,23 +115,36 @@ class GptSampler(Sampler):
             eos_idx = enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>", "<|im_start|>"})[0]
             outputs = [choice.text for choice in response.choices]
         else:
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prefix},
-                ],
-                temperature=temperature,
-                max_tokens=1,
-                logit_bias=logit_bias,
-                n=K,
-            )
+            if logit_bias is not None:
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prefix},
+                    ],
+                    temperature=temperature,
+                    max_tokens=1,
+                    logit_bias=logit_bias,
+                    n=K,
+                )
+            else:
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prefix},
+                    ],
+                    temperature=temperature,
+                    max_tokens=1,
+                    n=K,
+                )
             output = response.choices[0].message["content"]
             outputs = [choice.message["content"] for choice in response.choices]
             eos_idx = enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>", "<|im_start|>"})[0]
 
+        # just give eos_idx if there's a weird failure
         if response.choices[0].finish_reason == "length":
-            idx = enc.encode(output)[0]
+            idx = enc.encode(output)[0] if output else eos_idx
         elif response.choices[0].finish_reason == "stop":
             idx = eos_idx
         else:

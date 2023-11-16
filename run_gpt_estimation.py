@@ -25,6 +25,7 @@ d = dataset[index]
 prefix = d["user"]
 
 model = "gpt-3.5-turbo-instruct"
+#model = "gpt-3.5-turbo"
 sampler = GptSampler(model)
 
 lp, total_calls = gptdiffsearch(sampler, prefix, eps=eps)
