@@ -5,6 +5,8 @@ import math
 import torch
 import numpy as np
 from scipy.special import logsumexp
+import tiktoken
+import openai
 
 #from rich.progress import track
 
@@ -91,14 +93,23 @@ class GptSampler(Sampler):
 
         enc = tiktoken.encoding_for_model(model)
         if model == "gpt-3.5-turbo-instruct":
-            response = openai.Completion.create(
-                model=model,
-                prompt=prefix,
-                temperature=temperature,
-                max_tokens=1,
-                logit_bias=logit_bias,
-                n=K,
-            )
+            if logit_bias is not None:
+                response = openai.Completion.create(
+                    model=model,
+                    prompt=prefix,
+                    temperature=temperature,
+                    max_tokens=1,
+                    logit_bias=logit_bias,
+                    n=K,
+                )
+            else:
+                response = openai.Completion.create(
+                    model=model,
+                    prompt=prefix,
+                    temperature=temperature,
+                    max_tokens=1,
+                    n=K,
+                )
             output = response.choices[0].text
             eos_idx = enc.encode("<|endoftext|>", allowed_special={"<|endoftext|>", "<|im_start|>"})[0]
             outputs = [choice.text for choice in response.choices]
@@ -238,9 +249,34 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
     return mid, idx, num_calls, idx_lower
 
 
-def bisection_search(sampler, prefix, logit_bias, low=0, high=0.2, eps=1e-8):
+def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
     # todo: implement the paper version w/ openai compatibility
-    pass
+    # get highest idx / argmax
+    highest_idx = sampler.sample(prefix, 1, None, temperature=0).argmax
+    logits = np.zeros(sampler.vocab_size, dtype=np.float64)
+
+    # initialize high
+    logit_bias = {idx: high}
+    num_calls = 1
+    while sampler.sample(prefix, 1, logit_bias, temperature=0).argmax == highest_idx:
+        logit_bias[idx] *= 2
+        num_calls += 1
+    high = logit_bias[idx]
+
+    # improve estimate
+    mid = (high + low) / 2
+    while high > low + eps:
+        logit_bias[idx] = mid
+        idx2 = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+        if idx2 == idx:
+            high = mid
+        else:
+            low = mid
+        mid = (high + low) / 2
+        num_calls += 1
+    return mid, num_calls
+
+
 
 def batch_bisection_search(sampler, prefix, logit_bias, low=0, high=0.2, eps=1e-8):
     # for efficiency: specialized to case where we have true logits
@@ -365,6 +401,22 @@ def batch_diffsearch(sampler, prefix, eps=1e-8):
     logit_bias = np.zeros(vocab_size, dtype=np.float64)
     estimated_logits, idx, num_calls = batch_bisection_search(sampler, prefix, logit_bias, eps=eps)
     return estimated_logits - logsumexp(estimated_logits), num_calls
+
+def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-8):
+    vocab_size = sampler.vocab_size
+    logit_bias = {}
+    highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+    logits = np.zeros(vocab_size, dtype=np.float64)
+
+    total_calls = 1
+    for x in range(vocab_size):
+        logit_diff, num_calls = bisection_search(x, sampler, prefix, eps=eps)
+        total_calls += num_calls
+        if logit_diff is None:
+            break
+        logits[x] = logit_diff
+
+    return logits - logsumexp(logits), total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
