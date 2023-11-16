@@ -8,6 +8,8 @@ from scipy.special import logsumexp
 import tiktoken
 import openai
 
+from concurrent.futures import ThreadPoolExecutor
+import threading
 #from rich.progress import track
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -149,6 +151,7 @@ class GptSampler(Sampler):
             idx = eos_idx
         else:
             import pdb; pdb.set_trace()
+        #print(response)
 
         if temperature > 0:
             samples = [enc.encode(output) for output in outputs]
@@ -416,21 +419,38 @@ def batch_diffsearch(sampler, prefix, eps=1e-8):
     estimated_logits, idx, num_calls = batch_bisection_search(sampler, prefix, logit_bias, eps=eps)
     return estimated_logits - logsumexp(estimated_logits), num_calls
 
-def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-8):
+class LockedOutput:
+    def __init__(self, vocab_size, total_calls=0):
+        self.lock = threading.Lock()
+        self.total_calls = total_calls
+        self.logits = np.zeros(vocab_size, dtype=np.float64)
+
+    def add(self, calls, x, diff):
+        print("obtaining lock for", x)
+        with self.lock:
+            self.total_calls += calls
+            self.logits[x] = diff
+            print(x, calls, self.total_calls)
+
+def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     vocab_size = sampler.vocab_size
     logit_bias = {}
     highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
-    logits = np.zeros(vocab_size, dtype=np.float64)
 
-    total_calls = 1
-    for x in range(vocab_size):
+    output = LockedOutput(vocab_size, total_calls = 1)
+    def worker(x, output):
+        #print("running bisection for", x)
         logit_diff, num_calls = bisection_search(x, sampler, prefix, eps=eps)
-        total_calls += num_calls
-        if logit_diff is None:
-            break
-        logits[x] = logit_diff
+        print("ran bisection for", x)
+        output.add(num_calls, x, logit_diff)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for x in range(vocab_size):
+            if x != highest_idx:
+                #print("submitting", x)
+                pool.submit(worker, x, output)
 
-    return logits - logsumexp(logits), total_calls
+    logits = output.logits
+    return logits - logsumexp(logits), output.total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
