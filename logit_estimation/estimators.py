@@ -270,7 +270,6 @@ def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
     # todo: implement the paper version w/ openai compatibility
     # get highest idx / argmax
     highest_idx = sampler.sample(prefix, 1, None, temperature=0).argmax
-    logits = np.zeros(sampler.vocab_size, dtype=np.float64)
 
     # initialize high
     logit_bias = {idx: high}
@@ -291,9 +290,7 @@ def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
             low = mid
         mid = (high + low) / 2
         num_calls += 1
-    return mid, num_calls
-
-
+    return -mid, num_calls
 
 def batch_bisection_search(sampler, prefix, logit_bias, low=0, high=0.2, eps=1e-8):
     # for efficiency: specialized to case where we have true logits
@@ -436,6 +433,7 @@ def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     vocab_size = sampler.vocab_size
     logit_bias = {}
     highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+    import pdb; pdb.set_trace()
 
     output = LockedOutput(vocab_size, total_calls = 1)
     def worker(x, output):
