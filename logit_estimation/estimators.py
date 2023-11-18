@@ -343,9 +343,12 @@ def prob_search(idx, sampler, prefix, high=10):
     diff = topk[highest_idx] - output[highest_idx]
     logZ = high - math.log(math.exp(diff) - 1)
     # ideally would be output[idx], but it seems like openai sometimes returns weird things?
-    fv = output[new_max_idx] + math.log(math.exp(logZ) + math.exp(high)) - high
+    fv = np.max(list(output.values())) + math.log(math.exp(logZ) + math.exp(high)) - high
     logprob = fv - logZ
 
+    if np.max(list(output.values())) == output[highest_idx]:
+        # highest probability word didnt change
+        import pdb; pdb.set_trace()
 
     return logprob, num_calls
 
