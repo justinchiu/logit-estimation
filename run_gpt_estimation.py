@@ -1,6 +1,6 @@
 import numpy as np
 from datasets import load_dataset
-from logit_estimation.estimators import naive_estimate, GptSampler, gptdiffsearch
+from logit_estimation.estimators import naive_estimate, GptSampler, gptdiffsearch, gptprobsearch
 import random
 from scipy.special import logsumexp
 
@@ -27,6 +27,9 @@ prefix = d["user"]
 model = "gpt-3.5-turbo-instruct"
 #model = "gpt-3.5-turbo"
 sampler = GptSampler(model)
+
+lp, total_calls = gptprobsearch(sampler, prefix, eps=eps)
+np.save(f"saved_logits-gpt/{index}-prob-{total_calls}-eps{eps}.npy", lp)
 
 lp, total_calls = gptdiffsearch(sampler, prefix, eps=eps)
 np.save(f"saved_logits-gpt/{index}-diff-{total_calls}-eps{eps}.npy", lp)

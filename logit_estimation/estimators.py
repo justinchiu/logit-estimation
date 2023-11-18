@@ -90,6 +90,36 @@ class GptSampler(Sampler):
         self.model = model
         self.vocab_size = enc.n_vocab
 
+    def topk(self, prefix, logit_bias=None, temperature=1, system=None):
+        model = self.model
+
+        enc = tiktoken.encoding_for_model(model)
+        if model == "gpt-3.5-turbo-instruct":
+            if logit_bias is not None:
+                response = openai.Completion.create(
+                    model=model,
+                    prompt=prefix,
+                    temperature=temperature,
+                    max_tokens=1,
+                    logit_bias=logit_bias,
+                    logprobs=5,
+                )
+            else:
+                response = openai.Completion.create(
+                    model=model,
+                    prompt=prefix,
+                    temperature=temperature,
+                    max_tokens=1,
+                    logprobs=5,
+                )
+        topk_dict = response.choices[0].logprobs.top_logprobs[0]
+        print(topk_dict)
+        # convert to index representation
+        return {
+            enc.encode(x)[0]: y
+            for x,y in topk_dict.items()
+        }
+
     def sample(self, prefix, K, logit_bias=None, temperature=1, system=None):
         model = self.model
         system = "You are a helpful assistant." if system is None else system
@@ -101,7 +131,7 @@ class GptSampler(Sampler):
                     model=model,
                     prompt=prefix,
                     temperature=temperature,
-                    max_tokens=2,
+                    max_tokens=1,
                     logit_bias=logit_bias,
                     n=K,
                 )
@@ -197,7 +227,6 @@ class Estimator:
 
         lp = np.full((self.vocab_size,), float("-inf"), dtype=np.float64)
         np.logaddexp.at(lp, s, w)
-        # is this numerically stable?
          
         log_probs = lp - np.log(self.Zs)
 
@@ -267,7 +296,6 @@ def binary_search(sampler, prefix, logit_bias, low=-0.25, high=0, eps=1e-8):
 
 
 def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
-    # todo: implement the paper version w/ openai compatibility
     # get highest idx / argmax
     highest_idx = sampler.sample(prefix, 1, None, temperature=0).argmax
 
@@ -291,6 +319,31 @@ def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
         mid = (high + low) / 2
         num_calls += 1
     return -mid, num_calls
+
+def prob_search(idx, sampler, prefix, high=10):
+    # get raw topk
+    topk = sampler.topk(prefix)
+    highest_idx = list(topk.keys())[np.argmax(list(topk.values()))]
+    if idx == highest_idx:
+        return topk[idx], 1
+
+    # initialize high
+    logit_bias = {idx: high}
+    num_calls = 1
+    while sampler.sample(prefix, 1, logit_bias, temperature=0).argmax == highest_idx:
+        logit_bias[idx] *= 2
+        num_calls += 1
+    high = logit_bias[idx]
+    output = sampler.topk(prefix, logit_bias)
+    num_calls += 1
+
+    # compute normalizing constant
+    diff = topk[highest_idx] - output[highest_idx]
+    logZ = high - math.log(math.exp(diff) - 1)
+    fv = output[idx] + math.log(math.exp(logZ) + math.exp(high)) - high
+    logprob = fv - logZ
+
+    return logprob, num_calls
 
 def batch_bisection_search(sampler, prefix, logit_bias, low=0, high=0.2, eps=1e-8):
     # for efficiency: specialized to case where we have true logits
@@ -433,7 +486,6 @@ def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     vocab_size = sampler.vocab_size
     logit_bias = {}
     highest_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
-    import pdb; pdb.set_trace()
 
     output = LockedOutput(vocab_size, total_calls = 1)
     def worker(x, output):
@@ -449,6 +501,31 @@ def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
 
     logits = output.logits
     return logits - logsumexp(logits), output.total_calls
+
+def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
+    vocab_size = sampler.vocab_size
+    logit_bias = {}
+
+    """
+    # for debugging
+    topk = sampler.topk(prefix)
+    highest_idx = list(topk.keys())[np.argmax(list(topk.values()))]
+
+    for x in topk.keys():
+        logprob, num_calls2 = prob_search(x, sampler, prefix)
+        print(logprob, topk[x])
+    import pdb; pdb.set_trace()
+    # end debugging
+    """
+    logits = np.zeros(vocab_size, dtype=np.float64)
+    total_calls = 0
+
+    for x in range(vocab_size):
+        logprob, num_calls = prob_search(x, sampler, prefix)
+        logits[x] = logprob
+        total_calls += num_calls
+
+    return logits, total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
