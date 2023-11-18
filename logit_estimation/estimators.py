@@ -349,6 +349,7 @@ def prob_search(idx, sampler, prefix, high=10):
 
     if np.max(list(output.values())) == output[highest_idx]:
         # highest probability word didnt change
+        print("MESSED UP", idx, new_max_idx, highest_idx, topk, output)
         import pdb; pdb.set_trace()
 
     return logprob, num_calls
@@ -535,6 +536,8 @@ def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
         logits[x] = logprob
         total_calls += num_calls
     """
+    #logprob, num_calls = prob_search(73, sampler, prefix)
+    #import pdb; pdb.set_trace()
 
     output = LockedOutput(vocab_size, total_calls = 0)
     def worker(x, output):
