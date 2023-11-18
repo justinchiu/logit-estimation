@@ -113,7 +113,7 @@ class GptSampler(Sampler):
                     logprobs=5,
                 )
         topk_dict = response.choices[0].logprobs.top_logprobs[0]
-        print(topk_dict)
+        #print(topk_dict)
         # convert to index representation
         return {
             enc.encode(x)[0]: y
@@ -524,13 +524,26 @@ def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     import pdb; pdb.set_trace()
     # end debugging
     """
+    """
+    # non-parallel
     logits = np.zeros(vocab_size, dtype=np.float64)
     total_calls = 0
 
-    for x in range(vocab_size):
+    for x in tqdm(range(vocab_size)):
         logprob, num_calls = prob_search(x, sampler, prefix)
         logits[x] = logprob
         total_calls += num_calls
+    """
+
+    output = LockedOutput(vocab_size, total_calls = 0)
+    def worker(x, output):
+        #print("running bisection for", x)
+        logprob, num_calls = prob_search(x, sampler, prefix)
+        print("ran search for", x)
+        output.add(num_calls, x, logprob)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for x in range(vocab_size):
+            pool.submit(worker, x, output)
 
     return logits, total_calls
 
