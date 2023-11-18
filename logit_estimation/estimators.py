@@ -484,11 +484,11 @@ class LockedOutput:
         self.logits = np.zeros(vocab_size, dtype=np.float64)
 
     def add(self, calls, x, diff):
-        print("obtaining lock for", x)
+        #print("obtaining lock for", x)
         with self.lock:
             self.total_calls += calls
             self.logits[x] = diff
-            print(x, calls, self.total_calls)
+            #print(x, calls, self.total_calls)
 
 def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     vocab_size = sampler.vocab_size
@@ -540,7 +540,7 @@ def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     def worker(x, output):
         #print("running bisection for", x)
         logprob, num_calls = prob_search(x, sampler, prefix)
-        print("ran search for", x)
+        #print("ran search for", x)
         output.add(num_calls, x, logprob)
     with tqdm(total=vocab_size) as pbar:
         with ThreadPoolExecutor(max_workers=8) as pool:
