@@ -7,8 +7,9 @@ import numpy as np
 from scipy.special import logsumexp
 import tiktoken
 import openai
+from tqdm import tqdm
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 #from rich.progress import track
 
@@ -541,9 +542,11 @@ def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
         logprob, num_calls = prob_search(x, sampler, prefix)
         print("ran search for", x)
         output.add(num_calls, x, logprob)
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        for x in range(vocab_size):
-            pool.submit(worker, x, output)
+    with tqdm(total=vocab_size) as pbar:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(worker, x, output) for x in range(vocab_size)]
+            for future in as_completed(futures):
+                pbar.update(1)
 
     return logits, total_calls
 
