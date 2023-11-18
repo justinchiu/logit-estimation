@@ -321,7 +321,7 @@ def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
         num_calls += 1
     return -mid, num_calls
 
-def prob_search(idx, sampler, prefix, high=10):
+def prob_search(idx, sampler, prefix, high=16):
     # get raw topk
     topk = sampler.topk(prefix)
     highest_idx = list(topk.keys())[np.argmax(list(topk.values()))]
@@ -349,7 +349,7 @@ def prob_search(idx, sampler, prefix, high=10):
 
     if np.max(list(output.values())) == output[highest_idx]:
         # highest probability word didnt change
-        print("MESSED UP", idx, new_max_idx, highest_idx, topk, output)
+        print("MESSED UP", idx, high, new_max_idx, highest_idx, topk, output)
         import pdb; pdb.set_trace()
 
     return logprob, num_calls
