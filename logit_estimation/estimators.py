@@ -329,9 +329,11 @@ def prob_search(idx, sampler, prefix, high=10):
 
     # initialize high
     logit_bias = {idx: high}
-    num_calls = 1
-    while sampler.sample(prefix, 1, logit_bias, temperature=0).argmax == highest_idx:
+    new_max_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
+    num_calls = 2
+    while new_max_idx == highest_idx:
         logit_bias[idx] *= 2
+        new_max_idx = sampler.sample(prefix, 1, logit_bias, temperature=0).argmax
         num_calls += 1
     high = logit_bias[idx]
     output = sampler.topk(prefix, logit_bias)
@@ -340,8 +342,10 @@ def prob_search(idx, sampler, prefix, high=10):
     # compute normalizing constant
     diff = topk[highest_idx] - output[highest_idx]
     logZ = high - math.log(math.exp(diff) - 1)
-    fv = output[idx] + math.log(math.exp(logZ) + math.exp(high)) - high
+    # ideally would be output[idx], but it seems like openai sometimes returns weird things?
+    fv = output[new_max_idx] + math.log(math.exp(logZ) + math.exp(high)) - high
     logprob = fv - logZ
+
 
     return logprob, num_calls
 
