@@ -321,7 +321,7 @@ def bisection_search(idx, sampler, prefix, low=0, high=0.2, eps=1e-8):
         num_calls += 1
     return -mid, num_calls
 
-def prob_search(idx, sampler, prefix, high=16):
+def prob_search(idx, sampler, prefix, high=40):
     # get raw topk
     topk = sampler.topk(prefix)
     highest_idx = list(topk.keys())[np.argmax(list(topk.values()))]
@@ -490,6 +490,8 @@ class LockedOutput:
             self.total_calls += calls
             self.logits[x] = diff
             #print(x, calls, self.total_calls)
+            with open("temp/out.npy", "wb") as f:
+                np.save(f, self.logits)
 
 def gptdiffsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
     vocab_size = sampler.vocab_size
@@ -551,7 +553,7 @@ def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
             for future in as_completed(futures):
                 pbar.update(1)
 
-    return logits, total_calls
+    return output.logits, output.total_calls
 
 def search_then_estimate(sampler, prefix, K, T, threshold):
     vocab_size = sampler.vocab_size
