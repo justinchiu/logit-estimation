@@ -548,7 +548,7 @@ def gptprobsearch(sampler, prefix, logit_bias=None, bias=-100, eps=1e-6):
         #print("ran search for", x)
         output.add(num_calls, x, logprob)
     with tqdm(total=vocab_size) as pbar:
-        with ThreadPoolExecutor(max_workers=16) as pool:
+        with ThreadPoolExecutor(max_workers=8) as pool:
             futures = [pool.submit(worker, x, output) for x in range(vocab_size)]
             for future in as_completed(futures):
                 pbar.update(1)
