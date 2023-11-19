@@ -31,10 +31,10 @@ sampler = GptSampler(model)
 lp, total_calls = gptprobsearch(sampler, prefix, eps=eps)
 np.save(f"saved_logits-gpt/{index}-prob-{total_calls}-eps{eps}.npy", lp)
 
-lp, total_calls = gptdiffsearch(sampler, prefix, eps=eps)
-np.save(f"saved_logits-gpt/{index}-diff-{total_calls}-eps{eps}.npy", lp)
+#lp, total_calls = gptdiffsearch(sampler, prefix, eps=eps)
+#np.save(f"saved_logits-gpt/{index}-diff-{total_calls}-eps{eps}.npy", lp)
 
-estimator, num_calls = naive_estimate(sampler, prefix, total_calls)
-log_probs = estimator.mean()
-np.save(f"saved_logits-gpt/{index}-mc-{total_calls}.npy", log_probs)
+#estimator, num_calls = naive_estimate(sampler, prefix, total_calls)
+#log_probs = estimator.mean()
+#np.save(f"saved_logits-gpt/{index}-mc-{total_calls}.npy", log_probs)
 
